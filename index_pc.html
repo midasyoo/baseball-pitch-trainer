@@ -128,8 +128,8 @@
   .yn button.sel-yes{background:var(--good); border-color:var(--good); color:#fff;}
   .yn button.sel-no{background:var(--fast); border-color:var(--fast); color:#fff;}
   #score-btn{width:100%; margin-top:10px; padding:11px 0; border-radius:10px; border:none; background:var(--accent); color:#20242e; font-size:14px; font-weight:800; cursor:pointer;}
-  .grip-photo-btn{flex:1; padding:10px 0; border-radius:10px; border:1px solid var(--accent2); background:var(--panel2); color:var(--accent2); font-size:12.5px; font-weight:800; cursor:pointer;}
-  .grip-photo-btn:hover{background:#223052;}
+  #grip-photo-btn{width:100%; padding:10px 0; border-radius:10px; border:1px solid var(--accent2); background:var(--panel2); color:var(--accent2); font-size:13px; font-weight:800; cursor:pointer;}
+  #grip-photo-btn:hover{background:#223052;}
   #score-result{margin-top:12px;}
   .score-big{font-size:34px; font-weight:900; color:var(--accent); text-align:center;}
   .score-line{font-size:12.5px; line-height:1.7; color:#c9d3e8;}
@@ -233,8 +233,6 @@
   </div>
 </div>
 
-<!-- 구형 iOS Safari(16.4 미만) importmap 지원 폴리필 -->
-<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
 <script type="importmap">
 {
   "imports": {
@@ -242,26 +240,6 @@
     "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
   }
 }
-</script>
-<!-- 부팅 감시: 3D 시작 실패 시(메일 미리보기·파일 직접 열기·오프라인) 안내 표시 -->
-<script>
-setTimeout(function(){
-  if(window.__APP_BOOTED) return;
-  var d = document.createElement('div');
-  d.style.cssText = 'position:fixed;inset:0;z-index:999;background:rgba(10,14,24,.97);color:#e8edf7;' +
-    'display:flex;align-items:center;justify-content:center;padding:20px;text-align:center;' +
-    'font-size:13.5px;line-height:1.9;font-family:sans-serif';
-  d.innerHTML = (location.protocol === 'file:')
-    ? '<div style="max-width:320px">⚠️ <b style="color:#ffb300">3D 화면을 시작하지 못했어요</b><br><br>' +
-      '메일·카톡의 파일 미리보기나 파일 직접 열기로는<br>실행되지 않아요.<br><br>' +
-      '📱 <b>아이폰에서 보는 방법</b><br>' +
-      'PC에서 <b style="color:#4fc3f7">node serve.js</b> 실행 후<br>' +
-      '같은 와이파이의 아이폰 Safari에서<br><b style="color:#4fc3f7">http://PC주소:8770</b> 접속<br><br>' +
-      '💻 PC에서는 Chrome/Edge로 열어주세요</div>'
-    : '<div style="max-width:320px">⚠️ <b style="color:#ffb300">3D 라이브러리를 불러오지 못했어요</b><br><br>' +
-      '인터넷 연결을 확인한 뒤<br>새로고침 해주세요.</div>';
-  document.body.appendChild(d);
-}, 6000);
 </script>
 
 <script type="module">
@@ -2079,13 +2057,9 @@ function renderPracticePanel(){
     <ul style="list-style:none;padding-left:2px">${routine}</ul>
     ${safetyHtml}
     <h3>📷 카메라 그립 체크 (베타)</h3>
-    <p style="font-size:11.5px;color:var(--dim)">실제 공을 쥔 손을 사진으로 찍거나 앨범에서 올리면 AI가 손가락 위치를 인식해 이 구종에 맞는지 알려줍니다.</p>
-    <input type="file" id="grip-photo-camera" accept="image/*" capture="environment" style="display:none">
-    <input type="file" id="grip-photo-album" accept="image/*" style="display:none">
-    <div style="display:flex;gap:8px">
-      <button id="grip-photo-btn" class="grip-photo-btn">📷 사진 찍기</button>
-      <button id="grip-album-btn" class="grip-photo-btn">🖼 앨범에서 올리기</button>
-    </div>
+    <p style="font-size:11.5px;color:var(--dim)">실제 공을 쥔 손을 사진으로 찍어 올리면 AI가 손가락 위치를 인식해 이 구종에 맞는지 알려줍니다.</p>
+    <input type="file" id="grip-photo-input" accept="image/*" capture="environment" style="display:none">
+    <button id="grip-photo-btn">📷 그립 사진 찍기 / 올리기</button>
     <canvas id="grip-photo-canvas" style="width:100%;display:none;border-radius:10px;margin-top:8px"></canvas>
     <div id="grip-photo-result"></div>
     <h3>✅ 자가진단 — 실제 공을 쥐고 확인하세요</h3>
@@ -2098,20 +2072,17 @@ function renderPracticePanel(){
   // routine을 리스트로 다시 렌더 (위 join 안전 처리)
   el.practicePanel.querySelector('ul').innerHTML = routine;
 
-  // 카메라 그립 체크 연결: 카메라(즉시 촬영) / 앨범(사진 보관함) 각각
+  // 카메라 그립 체크 연결
+  const photoInput = el.practicePanel.querySelector('#grip-photo-input');
+  const photoBtn = el.practicePanel.querySelector('#grip-photo-btn');
   const photoCanvas = el.practicePanel.querySelector('#grip-photo-canvas');
   const photoResult = el.practicePanel.querySelector('#grip-photo-result');
-  const wirePhoto = (btnId, inputId)=>{
-    const input = el.practicePanel.querySelector(inputId);
-    el.practicePanel.querySelector(btnId).addEventListener('click', ()=> input.click());
-    input.addEventListener('change', ()=>{
-      const f = input.files && input.files[0];
-      if(f) analyzeGripPhoto(f, photoCanvas, photoResult);
-      input.value = '';
-    });
-  };
-  wirePhoto('#grip-photo-btn', '#grip-photo-camera');
-  wirePhoto('#grip-album-btn', '#grip-photo-album');
+  photoBtn.addEventListener('click', ()=> photoInput.click());
+  photoInput.addEventListener('change', ()=>{
+    const f = photoInput.files && photoInput.files[0];
+    if(f) analyzeGripPhoto(f, photoCanvas, photoResult);
+    photoInput.value = '';
+  });
 
   el.practicePanel.querySelectorAll('.yn button').forEach(b=>{
     b.addEventListener('click', ()=>{
@@ -2535,7 +2506,6 @@ function applyDeepLink(){
 applyDeepLink();
 resize();
 animate();
-window.__APP_BOOTED = true;   // 부팅 감시 해제
 </script>
 </body>
 </html>
