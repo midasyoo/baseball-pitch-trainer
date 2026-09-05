@@ -1307,6 +1307,7 @@ class HandRig {
     const NAIL_M = new THREE.MeshStandardMaterial({color:0xf0d2c4, roughness:0.22, side:THREE.DoubleSide});
     const EDGE_M = new THREE.MeshStandardMaterial({color:0xf8ede2, roughness:0.25, side:THREE.DoubleSide});
     const ARC = 1.85;                                            // 손톱이 감싸는 각도(~106°)
+    const idxProx = this.joints['index-finger-phalanx-proximal'].getWorldPosition(new THREE.Vector3());
     for(const [name, chain] of Object.entries(HAND_CHAINS)){
       const distal = this.joints[chain[2]], tip = this.joints[chain[3]];
       if(!distal || !tip) continue;
@@ -1314,24 +1315,27 @@ class HandRig {
       const tp = tip.getWorldPosition(new THREE.Vector3());
       const dp = distal.getWorldPosition(new THREE.Vector3());
       const dir = tp.clone().sub(dp).normalize();               // 손가락 축 방향 (끝마디 → 손끝)
-      // 손등(손톱) 방향: 배치 후 바인드 포즈에서 손등은 -Z, 엄지는 바깥(+X) 쪽
-      const rawDorsal = (name === 'thumb') ? new THREE.Vector3(0.8, 0, -0.6) : new THREE.Vector3(0, 0, -1);
+      // 손등(손톱) 방향: 일반 손가락은 바인드 포즈 손등(-Z),
+      // 엄지는 마주 쥐는 방향(검지 뿌리 쪽)의 정반대 = 실제 엄지 손톱 면
+      const rawDorsal = (name === 'thumb')
+        ? tp.clone().sub(idxProx).normalize()
+        : new THREE.Vector3(0, 0, -1);
       const dorsal = rawDorsal.addScaledVector(dir, -rawDorsal.dot(dir)).normalize();
+      const rf = (name === 'thumb') ? 0.80 : 0.98;              // 엄지는 판 반경 축소(들뜸 방지)
       const g = new THREE.Group();
       // 몸판: 축이 손가락 방향(+Y), 아크 중심이 손등(+Z)을 향하는 열린 원통 셸
-      // (손끝 살이 볼록하므로 반지름을 키우고 손등 쪽으로 살짝 띄움)
       const plate = new THREE.Mesh(
-        new THREE.CylinderGeometry(pad*1.00, pad*1.12, pad*1.05, 20, 1, true, -ARC/2, ARC), NAIL_M);
-      plate.position.y = -pad*0.44;
+        new THREE.CylinderGeometry(pad*rf*1.00, pad*rf*1.12, pad*0.95, 20, 1, true, -ARC/2, ARC), NAIL_M);
+      plate.position.y = -pad*0.34;
       g.add(plate);
       // 자유연: 손끝 쪽 얇고 밝은 띠
       const edge = new THREE.Mesh(
-        new THREE.CylinderGeometry(pad*1.00, pad*1.02, pad*0.18, 20, 1, true, -ARC/2, ARC), EDGE_M);
-      edge.position.y = pad*0.14;
+        new THREE.CylinderGeometry(pad*rf*0.99, pad*rf*1.01, pad*0.16, 20, 1, true, -ARC/2, ARC), EDGE_M);
+      edge.position.y = pad*0.18;
       g.add(edge);
       const x = new THREE.Vector3().crossVectors(dir, dorsal).normalize();
       g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, dir, dorsal));
-      g.position.copy(tp).addScaledVector(dorsal, pad*0.06);
+      g.position.copy(tp).addScaledVector(dorsal, pad*0.02);
       this.root.add(g);
       this.root.updateMatrixWorld(true);
       distal.attach(g);                                         // 월드 변환 보존한 채 뼈에 부착
