@@ -1303,25 +1303,38 @@ class HandRig {
     this._addNails();
   }
   _addNails(){
-    const NAIL_M = new THREE.MeshStandardMaterial({color:0xf3dbc4, roughness:0.28});
+    // 실제 손톱: 손가락 곡률을 감싸는 부분 원통 판(플레이트) + 끝의 밝은 자유연(free edge)
+    const NAIL_M = new THREE.MeshStandardMaterial({color:0xf0d2c4, roughness:0.22, side:THREE.DoubleSide});
+    const EDGE_M = new THREE.MeshStandardMaterial({color:0xf8ede2, roughness:0.25, side:THREE.DoubleSide});
+    const ARC = 1.85;                                            // 손톱이 감싸는 각도(~106°)
     for(const [name, chain] of Object.entries(HAND_CHAINS)){
       const distal = this.joints[chain[2]], tip = this.joints[chain[3]];
       if(!distal || !tip) continue;
       const pad = HAND_PAD[name];
       const tp = tip.getWorldPosition(new THREE.Vector3());
       const dp = distal.getWorldPosition(new THREE.Vector3());
-      const dir = tp.clone().sub(dp).normalize();               // 끝마디 → 손끝 방향
+      const dir = tp.clone().sub(dp).normalize();               // 손가락 축 방향 (끝마디 → 손끝)
       // 손등(손톱) 방향: 배치 후 바인드 포즈에서 손등은 -Z, 엄지는 바깥(+X) 쪽
       const rawDorsal = (name === 'thumb') ? new THREE.Vector3(0.8, 0, -0.6) : new THREE.Vector3(0, 0, -1);
       const dorsal = rawDorsal.addScaledVector(dir, -rawDorsal.dot(dir)).normalize();
-      const nail = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), NAIL_M);
-      nail.scale.set(pad*0.55, pad*0.18, pad*0.72);
-      const x = new THREE.Vector3().crossVectors(dorsal, dir).normalize();
-      nail.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, dorsal, dir));
-      nail.position.copy(tp).addScaledVector(dir, -pad*0.34).addScaledVector(dorsal, pad*0.50);
-      this.root.add(nail);
+      const g = new THREE.Group();
+      // 몸판: 축이 손가락 방향(+Y), 아크 중심이 손등(+Z)을 향하는 열린 원통 셸
+      // (손끝 살이 볼록하므로 반지름을 키우고 손등 쪽으로 살짝 띄움)
+      const plate = new THREE.Mesh(
+        new THREE.CylinderGeometry(pad*1.00, pad*1.12, pad*1.05, 20, 1, true, -ARC/2, ARC), NAIL_M);
+      plate.position.y = -pad*0.44;
+      g.add(plate);
+      // 자유연: 손끝 쪽 얇고 밝은 띠
+      const edge = new THREE.Mesh(
+        new THREE.CylinderGeometry(pad*1.00, pad*1.02, pad*0.18, 20, 1, true, -ARC/2, ARC), EDGE_M);
+      edge.position.y = pad*0.14;
+      g.add(edge);
+      const x = new THREE.Vector3().crossVectors(dir, dorsal).normalize();
+      g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, dir, dorsal));
+      g.position.copy(tp).addScaledVector(dorsal, pad*0.06);
+      this.root.add(g);
       this.root.updateMatrixWorld(true);
-      distal.attach(nail);                                      // 월드 변환 보존한 채 뼈에 부착
+      distal.attach(g);                                         // 월드 변환 보존한 채 뼈에 부착
     }
   }
   /* 측지선 행진: P0에서 접촉 방향 uC로, 각 뼈 길이만큼 목표점 생성 */
