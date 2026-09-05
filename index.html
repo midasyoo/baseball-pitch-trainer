@@ -1299,8 +1299,6 @@ class HandRig {
     const mp = this.joints['middle-finger-phalanx-proximal'].getWorldPosition(this._v1);
     this.placer.position.add(new THREE.Vector3(0.0,-0.02,-1.30).sub(mp));
     this.root.updateMatrixWorld(true);
-    // 손톱: 배치된 바인드 포즈에서 월드 좌표로 계산해 끝마디 뼈에 attach → 모든 포즈를 따라감
-    this._addNails();
   }
   _addNails(){
     // 실제 손톱: 손가락 곡률을 감싸는 부분 원통 판(플레이트) + 끝의 밝은 자유연(free edge)
