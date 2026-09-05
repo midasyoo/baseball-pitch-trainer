@@ -1299,6 +1299,30 @@ class HandRig {
     const mp = this.joints['middle-finger-phalanx-proximal'].getWorldPosition(this._v1);
     this.placer.position.add(new THREE.Vector3(0.0,-0.02,-1.30).sub(mp));
     this.root.updateMatrixWorld(true);
+    // 손톱: 배치된 바인드 포즈에서 월드 좌표로 계산해 끝마디 뼈에 attach → 모든 포즈를 따라감
+    this._addNails();
+  }
+  _addNails(){
+    const NAIL_M = new THREE.MeshStandardMaterial({color:0xf3dbc4, roughness:0.28});
+    for(const [name, chain] of Object.entries(HAND_CHAINS)){
+      const distal = this.joints[chain[2]], tip = this.joints[chain[3]];
+      if(!distal || !tip) continue;
+      const pad = HAND_PAD[name];
+      const tp = tip.getWorldPosition(new THREE.Vector3());
+      const dp = distal.getWorldPosition(new THREE.Vector3());
+      const dir = tp.clone().sub(dp).normalize();               // 끝마디 → 손끝 방향
+      // 손등(손톱) 방향: 배치 후 바인드 포즈에서 손등은 -Z, 엄지는 바깥(+X) 쪽
+      const rawDorsal = (name === 'thumb') ? new THREE.Vector3(0.8, 0, -0.6) : new THREE.Vector3(0, 0, -1);
+      const dorsal = rawDorsal.addScaledVector(dir, -rawDorsal.dot(dir)).normalize();
+      const nail = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), NAIL_M);
+      nail.scale.set(pad*0.55, pad*0.18, pad*0.72);
+      const x = new THREE.Vector3().crossVectors(dorsal, dir).normalize();
+      nail.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, dorsal, dir));
+      nail.position.copy(tp).addScaledVector(dir, -pad*0.34).addScaledVector(dorsal, pad*0.50);
+      this.root.add(nail);
+      this.root.updateMatrixWorld(true);
+      distal.attach(nail);                                      // 월드 변환 보존한 채 뼈에 부착
+    }
   }
   /* 측지선 행진: P0에서 접촉 방향 uC로, 각 뼈 길이만큼 목표점 생성 */
   _wrapTargets(P0, uC, lengths, pad){
