@@ -1,0 +1,2534 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="투구 트레이너">
+<title>야구 투구 트레이너 — Baseball Pitch Trainer</title>
+<style>
+  :root{
+    --bg:#0f1420; --panel:#171e2e; --panel2:#1e2740; --line:#2a3550;
+    --text:#e8edf7; --dim:#8b97b5; --accent:#ffb300; --accent2:#4fc3f7;
+    --good:#66bb6a; --warn:#ffa726; --fast:#ef5350; --brk:#ab47bc; --off:#26a69a; --spc:#78909c;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    overflow:hidden;
+  }
+  #app{display:flex; flex-direction:column; height:100vh;}
+
+  /* ── 헤더 ─────────────────────────── */
+  header{
+    height:54px; flex:0 0 54px; display:flex; align-items:center; gap:16px;
+    padding:0 16px; background:var(--panel); border-bottom:1px solid var(--line);
+  }
+  header .logo{font-size:18px; font-weight:800; letter-spacing:.5px;}
+  header .logo em{color:var(--accent); font-style:normal;}
+  .top-tabs{display:flex; gap:6px; margin-left:12px;}
+  .top-tab{
+    padding:8px 18px; border-radius:20px; border:1px solid var(--line);
+    background:transparent; color:var(--dim); font-size:14px; font-weight:700; cursor:pointer;
+  }
+  .top-tab.active{background:var(--accent); border-color:var(--accent); color:#20242e;}
+  header .note{margin-left:auto; font-size:11px; color:var(--dim);}
+
+  /* ── 본문 3단 ─────────────────────── */
+  #main{flex:1; display:grid; grid-template-columns:225px 1fr 350px; min-height:0;}
+
+  /* 사이드바 */
+  #sidebar{background:var(--panel); border-right:1px solid var(--line); overflow-y:auto; padding:12px 10px;}
+  .fam-title{font-size:11px; font-weight:800; letter-spacing:1px; color:var(--dim); margin:14px 4px 6px;}
+  .fam-title:first-child{margin-top:2px;}
+  .fam-title.FASTBALL{color:var(--fast);} .fam-title.BREAKING{color:var(--brk);}
+  .fam-title.OFFSPEED{color:var(--off);} .fam-title.SPECIAL{color:var(--spc);}
+  .pitch-btn{
+    display:flex; align-items:center; justify-content:space-between; width:100%;
+    padding:9px 12px; margin:4px 0; border-radius:10px; border:1px solid var(--line);
+    background:var(--panel2); color:var(--text); font-size:13px; font-weight:600;
+    cursor:pointer; text-align:left;
+  }
+  .pitch-btn:hover{border-color:var(--accent2);}
+  .pitch-btn.active{border-color:var(--accent); background:#2b3552; box-shadow:0 0 0 1px var(--accent) inset;}
+  .pitch-btn .en{font-size:10px; color:var(--dim); font-weight:400; display:block;}
+  .pitch-btn.locked{opacity:.45; cursor:not-allowed;}
+  .pitch-btn.locked:hover{border-color:var(--line);}
+  .lock{font-size:11px;}
+
+  /* 중앙: 3D + 하단바 */
+  #center{display:flex; flex-direction:column; min-width:0; min-height:0;}
+  #viewport{flex:1; position:relative; min-height:0; background:#0a0e18;}
+  #viewport canvas{display:block;}
+  #phase-label{
+    position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    padding:6px 20px; border-radius:18px; background:rgba(15,20,32,.82);
+    border:1px solid var(--line); font-size:15px; font-weight:800; letter-spacing:1.5px;
+    color:var(--accent); pointer-events:none; white-space:nowrap;
+  }
+  #pitch-badge{
+    position:absolute; top:14px; left:14px; padding:6px 12px; border-radius:10px;
+    background:rgba(15,20,32,.82); border:1px solid var(--line); pointer-events:none;
+  }
+  #pitch-badge .ko{font-size:15px; font-weight:800;}
+  #pitch-badge .en{font-size:10px; color:var(--dim);}
+  #pitch-badge .hand{font-size:10px; color:var(--accent2); margin-top:3px; font-weight:700;}
+  #spin-hud{
+    position:absolute; bottom:14px; left:14px; padding:8px 12px; border-radius:10px;
+    background:rgba(15,20,32,.86); border:1px solid var(--line); font-size:12px;
+    color:var(--accent2); display:none; max-width:260px; line-height:1.5;
+  }
+  .hud-row{cursor:pointer; padding:2px 6px; border-radius:6px; margin-top:2px; color:#c9d3e8;}
+  .hud-row:hover{background:#2b3552;}
+  .hud-row.sel{background:#2b3552; outline:1px solid var(--accent2);}
+  #drag-hint{
+    position:absolute; bottom:14px; right:14px; font-size:11px; color:var(--dim);
+    background:rgba(15,20,32,.7); padding:4px 10px; border-radius:8px; pointer-events:none;
+  }
+
+  #bottombar{
+    flex:0 0 auto; background:var(--panel); border-top:1px solid var(--line);
+    padding:8px 12px; display:flex; flex-wrap:wrap; gap:8px 18px; align-items:center;
+  }
+  .bar-group{display:flex; gap:5px; align-items:center;}
+  .bar-label{font-size:10px; color:var(--dim); font-weight:700; letter-spacing:1px; margin-right:2px;}
+  .sub-btn,.ctl-btn,.view-btn,.spd-btn{
+    padding:7px 13px; border-radius:8px; border:1px solid var(--line);
+    background:var(--panel2); color:var(--text); font-size:12px; font-weight:700; cursor:pointer;
+  }
+  .sub-btn:hover,.ctl-btn:hover,.view-btn:hover,.spd-btn:hover{border-color:var(--accent2);}
+  .sub-btn.active{background:var(--accent); color:#20242e; border-color:var(--accent);}
+  .view-btn.active,.spd-btn.active{background:var(--accent2); color:#0f1420; border-color:var(--accent2);}
+  button:disabled{opacity:.35; cursor:not-allowed !important;}
+  button:disabled:hover{border-color:var(--line) !important;}
+
+  /* 우측 정보 패널 */
+  #infopanel{background:var(--panel); border-left:1px solid var(--line); overflow-y:auto; padding:16px;}
+  #infopanel h2{font-size:16px; margin-bottom:4px;}
+  #infopanel h3{font-size:13px; color:var(--accent); margin:16px 0 6px;}
+  #infopanel p,#infopanel li{font-size:13px; line-height:1.65; color:#c9d3e8;}
+  #infopanel ul{padding-left:18px;}
+  .tag{display:inline-block; font-size:10px; font-weight:800; padding:2px 8px; border-radius:8px; margin-right:4px;}
+  .tag.FASTBALL{background:var(--fast); color:#fff;} .tag.BREAKING{background:var(--brk); color:#fff;}
+  .tag.OFFSPEED{background:var(--off); color:#fff;} .tag.SPECIAL{background:var(--spc); color:#fff;}
+  .diff{color:var(--accent); font-size:12px;}
+  .box{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:8px 0;}
+  .safety{border-left:3px solid var(--warn); background:#2b2416;}
+  .safety p{color:#ffd88a; font-size:12px;}
+
+  /* 자가진단 */
+  .q-item{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin:8px 0;}
+  .q-item .q{font-size:13px; margin-bottom:8px;}
+  .yn{display:flex; gap:6px;}
+  .yn button{flex:1; padding:6px 0; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--dim); font-weight:700; cursor:pointer; font-size:12px;}
+  .yn button.sel-yes{background:var(--good); border-color:var(--good); color:#fff;}
+  .yn button.sel-no{background:var(--fast); border-color:var(--fast); color:#fff;}
+  #score-btn{width:100%; margin-top:10px; padding:11px 0; border-radius:10px; border:none; background:var(--accent); color:#20242e; font-size:14px; font-weight:800; cursor:pointer;}
+  #grip-photo-btn{width:100%; padding:10px 0; border-radius:10px; border:1px solid var(--accent2); background:var(--panel2); color:var(--accent2); font-size:13px; font-weight:800; cursor:pointer;}
+  #grip-photo-btn:hover{background:#223052;}
+  #score-result{margin-top:12px;}
+  .score-big{font-size:34px; font-weight:900; color:var(--accent); text-align:center;}
+  .score-line{font-size:12.5px; line-height:1.7; color:#c9d3e8;}
+  .score-line.ok::before{content:"✓ "; color:var(--good); font-weight:900;}
+  .score-line.fix::before{content:"△ "; color:var(--warn); font-weight:900;}
+  .disclaimer{font-size:10.5px; color:var(--dim); margin-top:10px; text-align:center;}
+
+  /* ── 스마트폰(세로) 레이아웃: 구종 칩 가로 스크롤 → 3D → 컨트롤 → 정보 패널 세로 스택 ── */
+  @media (max-width: 820px){
+    body{overflow-y:auto; overflow-x:hidden;}
+    #app{height:auto; min-height:100dvh;}
+    header{height:auto; flex:0 0 auto; flex-wrap:wrap; padding:8px 10px; gap:8px;
+      position:sticky; top:0; z-index:20;}
+    header .logo{font-size:15px;}
+    .top-tab{padding:6px 13px; font-size:12.5px;}
+    header .note{display:none;}
+    #main{display:block; min-height:0;}
+    /* 구종 목록 → 가로 스크롤 칩 바 */
+    #sidebar{display:flex; flex-direction:row; align-items:center; gap:6px;
+      overflow-x:auto; overflow-y:hidden; padding:8px;
+      border-right:none; border-bottom:1px solid var(--line);
+      -webkit-overflow-scrolling:touch;}
+    .fam-title, .fam-title:first-child{flex:0 0 auto; margin:0 2px; font-size:10px; white-space:nowrap;}
+    .pitch-btn{flex:0 0 auto; width:auto; margin:0; padding:8px 11px; font-size:12px; white-space:nowrap;}
+    .pitch-btn .en{display:none;}
+    .pitch-btn span:last-child{margin-left:6px; font-size:10px;}
+    /* 3D 화면 */
+    #center{display:block;}
+    #viewport{height:47vh; min-height:300px;}
+    #pitch-badge{top:8px; left:8px; padding:4px 8px;}
+    #pitch-badge .ko{font-size:12.5px;}
+    #pitch-badge .en{display:none;}
+    #phase-label{top:8px; font-size:11px; padding:4px 12px; letter-spacing:0.5px; max-width:88%;
+      overflow:hidden; text-overflow:ellipsis;}
+    #spin-hud{max-width:190px; font-size:10.5px; bottom:8px; left:8px; padding:6px 9px;}
+    #drag-hint{display:none;}
+    /* 하단 컨트롤 */
+    #bottombar{padding:7px 8px; gap:6px 10px;}
+    .bar-label{font-size:9px;}
+    .sub-btn,.ctl-btn,.view-btn,.spd-btn{padding:7px 9px; font-size:11px;}
+    /* 정보/연습 패널: 3D 아래로 */
+    #infopanel{border-left:none; border-top:1px solid var(--line); padding:14px;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">⚾ BASEBALL <em>PITCH TRAINER</em></div>
+    <div class="top-tabs">
+      <button class="top-tab active" id="tab-learn">🧠 원리 이해</button>
+      <button class="top-tab" id="tab-practice">✋ 실제 연습</button>
+    </div>
+    <div class="note">청소년 학습용 시뮬레이터 · 전문 평가가 아닌 학습 참고용입니다</div>
+  </header>
+
+  <div id="main">
+    <nav id="sidebar"></nav>
+
+    <div id="center">
+      <div id="viewport">
+        <div id="pitch-badge"><div class="ko"></div><div class="en"></div><div class="hand">🖐 오른손 투수(우투) 기준</div></div>
+        <div id="phase-label"></div>
+        <div id="spin-hud"></div>
+        <div id="drag-hint">🖱️ 드래그: 회전 · 휠: 확대/축소</div>
+      </div>
+      <div id="bottombar">
+        <div class="bar-group" id="submode-group">
+          <span class="bar-label">단계</span>
+          <button class="sub-btn active" data-sub="GRIP">① 그립</button>
+          <button class="sub-btn" data-sub="RELEASE">② 릴리스</button>
+          <button class="sub-btn" data-sub="SPIN">③ 회전</button>
+          <button class="sub-btn" data-sub="MOTION">④ 투구 자세</button>
+          <button class="sub-btn" data-sub="PATH">⑤ 궤적</button>
+        </div>
+        <div class="bar-group">
+          <span class="bar-label">재생</span>
+          <button class="ctl-btn" id="btn-play">▶ 재생</button>
+          <button class="ctl-btn" id="btn-replay">⟲ 처음부터</button>
+        </div>
+        <div class="bar-group">
+          <span class="bar-label">속도</span>
+          <button class="spd-btn" data-speed="0.25">0.25x</button>
+          <button class="spd-btn" data-speed="0.5">0.5x</button>
+          <button class="spd-btn active" data-speed="1">1x</button>
+        </div>
+        <div class="bar-group">
+          <span class="bar-label">시점</span>
+          <button class="view-btn active" data-view="GRIP">그립</button>
+          <button class="view-btn" data-view="PITCHER">투수</button>
+          <button class="view-btn" data-view="CATCHER">포수</button>
+          <button class="view-btn" data-view="BATTER">타자</button>
+        </div>
+      </div>
+    </div>
+
+    <aside id="infopanel">
+      <div id="learn-panel"></div>
+      <div id="practice-panel" style="display:none"></div>
+    </aside>
+  </div>
+</div>
+
+<!-- 구형 iOS Safari(16.4 미만) importmap 지원 폴리필 -->
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<!-- 부팅 감시: 3D 시작 실패 시(메일 미리보기·파일 직접 열기·오프라인) 안내 표시 -->
+<script>
+setTimeout(function(){
+  if(window.__APP_BOOTED) return;
+  var d = document.createElement('div');
+  d.style.cssText = 'position:fixed;inset:0;z-index:999;background:rgba(10,14,24,.97);color:#e8edf7;' +
+    'display:flex;align-items:center;justify-content:center;padding:20px;text-align:center;' +
+    'font-size:13.5px;line-height:1.9;font-family:sans-serif';
+  d.innerHTML = (location.protocol === 'file:')
+    ? '<div style="max-width:320px">⚠️ <b style="color:#ffb300">3D 화면을 시작하지 못했어요</b><br><br>' +
+      '메일·카톡의 파일 미리보기나 파일 직접 열기로는<br>실행되지 않아요.<br><br>' +
+      '📱 <b>아이폰에서 보는 방법</b><br>' +
+      'PC에서 <b style="color:#4fc3f7">node serve.js</b> 실행 후<br>' +
+      '같은 와이파이의 아이폰 Safari에서<br><b style="color:#4fc3f7">http://PC주소:8770</b> 접속<br><br>' +
+      '💻 PC에서는 Chrome/Edge로 열어주세요</div>'
+    : '<div style="max-width:320px">⚠️ <b style="color:#ffb300">3D 라이브러리를 불러오지 못했어요</b><br><br>' +
+      '인터넷 연결을 확인한 뒤<br>새로고침 해주세요.</div>';
+  document.body.appendChild(d);
+}, 6000);
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ═══════════════════════════════════════════════════════════════
+   PITCH DATABASE — 엔진과 완전히 분리된 데이터.
+   새 구종을 추가할 때는 이 객체에 데이터만 추가하면 된다 (SDD 원칙 3·4).
+   phase:2 구종은 아래 6구종과 같은 필드를 채우고 phase:1 로 바꾸면
+   그립·릴리스·회전·자세·궤적·자가진단이 모두 자동으로 동작한다.
+   좌표계: X 좌우(+X = 새끼손가락/글러브쪽), Y 상하, Z 투구 방향(홈플레이트 +Z)
+   손가락 접촉점은 공 반지름 1 기준 상대좌표 (코드에서 자동 정규화).
+   ═══════════════════════════════════════════════════════════════ */
+const PITCHES = {
+
+  fourSeam: {
+    id:'fourSeam', phase:1, nameKo:'포심 패스트볼', nameEn:'Four-Seam Fastball',
+    family:'FASTBALL', difficulty:1,
+    summary:'모든 투구의 기본. 가장 빠르고 곧게 날아가는 공.',
+    principle:'검지·중지가 실밥을 가로질러 걸리기 때문에 공을 놓는 순간 실밥이 공기를 강하게 긁으며 강한 백스핀(역회전)이 걸립니다. 백스핀이 걸린 공은 위쪽 공기가 빨라져 공을 떠받치는 힘(마그누스 힘)이 생기고, 덕분에 덜 떨어지면서 "떠오르는 것처럼" 보입니다.',
+    grip:{
+      ballRotation:[0,0,0],
+      fingers:{
+        index:{pos:[0.20,0.86,0.40], main:true},
+        middle:{pos:[-0.20,0.86,0.40], main:true},
+        ring:{pos:[-0.72,0.42,0.42]},
+        pinky:{pos:[-0.94,-0.10,0.28]},
+        thumb:{pos:[0.10,-0.94,0.28], main:true}
+      },
+      note:'검지와 중지를 말굽(U자) 실밥을 가로질러 올리고, 엄지는 공 아래 중앙을 받칩니다. 공과 손바닥 사이에는 손가락 하나가 들어갈 틈을 남기세요 — 깊게 쥐면 공이 느려집니다.'
+    },
+    release:{ thumbTiming:0.62, fingerTiming:0.85,
+      fingers:{
+        index:{role:'snap',  timing:0.85}, middle:{role:'snap', timing:0.86},
+        ring:{role:'hold',   timing:0.70}, pinky:{role:'hold',  timing:0.68},
+        thumb:{role:'release', timing:0.62}
+      },
+      note:'엄지가 먼저 공에서 떨어지고, 검지·중지 두 손가락이 공 뒤쪽을 마지막까지 밀어주며 거의 동시에 공을 놓습니다. 손끝으로 공을 "튕겨서 긁는" 느낌이 백스핀을 만듭니다.' },
+    spin:{ axis:[-1,0.05,0], speed:1.0, rpm:2300, label:'강한 백스핀 (역회전)',
+      note:'회전축이 지면과 거의 수평으로 눕고, 공은 뒤로 구르듯 회전합니다. 회전이 강할수록 공이 덜 떨어집니다.' },
+    motion:{ armSlot:60, releaseHeight:1.0 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0,1.72,6], c2:[0,1.5,12], end:[0,1.12,17.6], speedFactor:1.0,
+      note:'가장 직선에 가까운 궤적. 다른 구종과 비교하는 기준이 됩니다.' },
+    coaching:[
+      {q:'검지와 중지가 실밥을 가로질러(실밥과 수직으로) 올라가 있나요?', correct:'YES', fb:'포심의 기본 손가락 위치입니다. 실밥에 손끝이 걸려야 강한 회전이 나옵니다.'},
+      {q:'공이 손바닥에 깊게 파묻혀 있나요?', correct:'NO', fb:'공과 손바닥 사이에 약간의 공간을 유지하세요. 깊게 쥐면 공이 느려집니다.'},
+      {q:'엄지가 공 아래쪽 중앙을 받치고 있나요?', correct:'YES', fb:'엄지가 아래 중앙을 받쳐야 공이 흔들리지 않습니다.'},
+      {q:'검지와 중지 사이가 손가락 3개 이상 벌어져 있나요?', correct:'NO', fb:'두 손가락은 1~2cm 정도만 벌립니다. 너무 벌리면 회전이 약해집니다.'}
+    ],
+    practice:{ routine:[
+      '① 3D 그립을 360° 돌려보며 실밥과 손가락 위치를 눈에 익힌다.',
+      '② 실제 공으로 화면과 똑같이 쥐고, 자가진단 체크리스트를 확인한다.',
+      '③ 손목만 써서 공을 위로 살짝 던졌다 받으며 백스핀 회전을 확인한다 (공 실밥이 일직선으로 보이면 성공).',
+      '④ 가까운 거리(5~10m)에서 부드럽게 캐치볼하며 릴리스 감각을 익힌다.'
+    ]}
+  },
+
+  twoSeam: {
+    id:'twoSeam', phase:1, nameKo:'투심 패스트볼', nameEn:'Two-Seam Fastball',
+    family:'FASTBALL', difficulty:2,
+    summary:'포심과 비슷하게 빠르지만, 팔 쪽으로 살짝 휘며 가라앉는 공.',
+    principle:'손가락을 좁은 두 줄 실밥 위에 나란히 올리면 회전축이 살짝 기울어집니다. 축이 기울면 마그누스 힘도 기울어서, 공이 똑바로 뜨는 대신 투수의 팔 쪽(우투수 기준 오른손 타자 몸쪽)으로 밀리며 살짝 가라앉습니다.',
+    grip:{
+      ballRotation:[0,Math.PI/2,0],
+      fingers:{
+        index:{pos:[0.13,0.88,0.38], main:true},
+        middle:{pos:[-0.13,0.88,0.38], main:true},
+        ring:{pos:[-0.68,0.50,0.42]},
+        pinky:{pos:[-0.92,0.00,0.30]},
+        thumb:{pos:[0,-0.95,0.26], main:true}
+      },
+      note:'실밥 두 줄이 좁게 모이는 곳에 검지·중지를 실밥을 따라 나란히 올립니다. 포심보다 손가락 간격이 좁습니다.'
+    },
+    release:{ thumbTiming:0.62, fingerTiming:0.85,
+      fingers:{
+        index:{role:'press', timing:0.86}, middle:{role:'snap', timing:0.84},
+        ring:{role:'hold',   timing:0.70}, pinky:{role:'hold',  timing:0.68},
+        thumb:{role:'release', timing:0.62}
+      },
+      note:'던지는 동작은 포심과 같지만, 검지가 마지막까지 공을 더 눌러주며 회전축이 기울어집니다.' },
+    spin:{ axis:[-0.9,-0.35,0.1], speed:0.95, rpm:2150, label:'기울어진 백스핀',
+      note:'포심보다 회전축이 기울어져 있습니다. 이 작은 차이가 공을 팔 쪽으로 휘게 만듭니다.' },
+    motion:{ armSlot:58, releaseHeight:0.97 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0,1.70,6], c2:[-0.15,1.45,12], end:[-0.38,0.95,17.6], speedFactor:0.98,
+      note:'포심 대비 팔 쪽(-X)으로 밀리며 조금 더 가라앉습니다.' },
+    coaching:[
+      {q:'검지와 중지가 좁은 두 실밥 위에 나란히(실밥을 따라) 올라가 있나요?', correct:'YES', fb:'투심의 핵심입니다. 실밥을 "가로지르는" 포심과 반대로 "따라가는" 그립입니다.'},
+      {q:'손가락 간격이 포심보다 좁은가요?', correct:'YES', fb:'두 실밥이 좁아지는 부분을 그대로 따라가면 자연스럽게 좁아집니다.'},
+      {q:'포심과 완전히 같은 위치를 쥐고 있나요?', correct:'NO', fb:'실밥 위 손가락 방향이 포심과 다르다는 것이 투심의 전부입니다. 3D 비교로 확인하세요.'}
+    ],
+    practice:{ routine:[
+      '① 포심 그립 → 투심 그립을 번갈아 쥐며 손가락 방향 차이를 익힌다.',
+      '② 실밥을 따라 손가락을 올렸는지 거울 또는 화면과 비교한다.',
+      '③ 가까운 거리 캐치볼에서 공이 살짝 휘는지 관찰한다 (억지로 휘게 하지 않기).'
+    ]}
+  },
+
+  cutter: {
+    id:'cutter', phase:1, nameKo:'커터', nameEn:'Cutter',
+    family:'FASTBALL', difficulty:3,
+    summary:'포심처럼 빠르게 오다가 마지막에 글러브 쪽으로 살짝 꺾이는 공.',
+    principle:'포심 그립에서 손가락을 중심보다 살짝 바깥(중지 쪽)으로 옮기면, 공을 놓는 순간 회전축이 조금 기울며 공 옆면에도 회전이 걸립니다. 그래서 거의 포심처럼 날아오다가 홈플레이트 근처에서 글러브 쪽으로 짧게 꺾입니다.',
+    grip:{
+      ballRotation:[0,0.4,0],
+      fingers:{
+        index:{pos:[-0.02,0.87,0.42], main:true},
+        middle:{pos:[-0.42,0.76,0.42], main:true},
+        ring:{pos:[-0.82,0.30,0.40]},
+        pinky:{pos:[-0.96,-0.20,0.24]},
+        thumb:{pos:[0.18,-0.92,0.22], main:true}
+      },
+      note:'포심 그립에서 검지·중지를 공 중심에서 약간 바깥쪽으로 이동시킵니다. 엄지도 반대쪽으로 살짝 따라갑니다.'
+    },
+    release:{ thumbTiming:0.60, fingerTiming:0.85,
+      fingers:{
+        index:{role:'snap',  timing:0.83}, middle:{role:'press', timing:0.86},
+        ring:{role:'hold',   timing:0.70}, pinky:{role:'hold',   timing:0.68},
+        thumb:{role:'release', timing:0.60}
+      },
+      note:'포심과 같은 팔 동작으로 던지되, 중지가 마지막까지 공을 눌러 끊듯이 놓습니다. 손목을 억지로 비틀지 않습니다.' },
+    spin:{ axis:[-0.75,0.55,0.15], speed:0.95, rpm:2400, label:'살짝 기울어진 회전',
+      note:'포심보다 회전축이 세로 방향으로 기울어, 마그누스 힘의 일부가 옆으로 작용합니다.' },
+    motion:{ armSlot:60, releaseHeight:1.0 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0,1.70,6], c2:[0.10,1.45,12], end:[0.30,1.00,17.6], speedFactor:0.97,
+      note:'포심과 거의 같다가 마지막에 글러브 쪽(+X)으로 짧게 꺾입니다.' },
+    coaching:[
+      {q:'그립이 포심에서 손가락만 살짝 바깥으로 이동한 형태인가요?', correct:'YES', fb:'커터는 "살짝 옮긴 포심"입니다. 크게 옮기면 슬라이더에 가까워집니다.'},
+      {q:'손목을 비틀어서 던지려고 하나요?', correct:'NO', fb:'손목 비틀기는 필요 없습니다. 그립 위치와 손끝 마무리만으로 충분합니다.'},
+      {q:'엄지가 검지 반대 방향으로 살짝 이동해 있나요?', correct:'YES', fb:'엄지가 따라가야 공을 안정적으로 잡을 수 있습니다.'}
+    ],
+    practice:{ routine:[
+      '① 포심 → 커터 그립 이동 폭(약 손가락 반 개)을 3D로 확인한다.',
+      '② 실제 공으로 포심과 커터를 번갈아 쥐며 차이를 손에 익힌다.',
+      '③ 캐치볼에서 팔 동작은 포심과 똑같이 유지하는 데 집중한다.'
+    ]}
+  },
+
+  slider: {
+    id:'slider', phase:1, nameKo:'슬라이더', nameEn:'Slider',
+    family:'BREAKING', difficulty:3,
+    summary:'옆으로 미끄러지듯 휘면서 살짝 떨어지는 대표 변화구.',
+    principle:'검지·중지를 공 중심에서 한쪽으로 치우쳐 잡고 공 옆면을 긁듯이 놓으면, 회전축이 크게 기울어 총알 회전에 가까운 사이드 스핀이 걸립니다. 옆으로 작용하는 마그누스 힘 때문에 공이 글러브 쪽으로 미끄러지며 낙차도 함께 생깁니다.',
+    grip:{
+      ballRotation:[0.3,0.5,0],
+      fingers:{
+        index:{pos:[-0.10,0.85,0.44], main:true},
+        middle:{pos:[-0.46,0.72,0.44], main:true},
+        ring:{pos:[-0.84,0.25,0.42]},
+        pinky:{pos:[-0.95,-0.24,0.26]},
+        thumb:{pos:[0.28,-0.90,0.18], main:true}
+      },
+      note:'검지·중지를 공 중심보다 바깥쪽 실밥에 걸치고, 중지가 실밥을 단단히 잡습니다. 커터보다 더 바깥쪽입니다.'
+    },
+    release:{ thumbTiming:0.58, fingerTiming:0.82,
+      fingers:{
+        index:{role:'press', timing:0.82}, middle:{role:'snap', timing:0.84},
+        ring:{role:'hold',   timing:0.72}, pinky:{role:'hold',  timing:0.70},
+        thumb:{role:'release', timing:0.58}
+      },
+      note:'공을 놓는 순간 중지 쪽 손끝이 공의 바깥 옆면을 강하게 긁고 지나갑니다. 문 손잡이를 돌리듯 손목을 크게 비트는 것이 아니라, 손끝 마무리로 회전을 만듭니다.' },
+    spin:{ axis:[-0.3,0.8,0.4], speed:0.9, rpm:2500, label:'사이드 스핀 (총알 회전에 가까움)',
+      note:'회전축이 크게 기울어 세로에 가깝습니다. 옆 방향 마그누스 힘이 커집니다.' },
+    motion:{ armSlot:58, releaseHeight:1.0 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0,1.68,6], c2:[0.15,1.40,12], end:[0.55,0.75,17.6], speedFactor:0.92,
+      note:'직진하다가 후반에 글러브 쪽(+X)으로 미끄러지며 떨어집니다.' },
+    coaching:[
+      {q:'검지·중지가 공 중심이 아니라 바깥쪽 실밥에 치우쳐 있나요?', correct:'YES', fb:'치우친 그립이 사이드 스핀의 시작입니다.'},
+      {q:'손목을 크게 비틀어 회전을 만들려고 하나요?', correct:'NO', fb:'손목 비틀기는 팔꿈치에 무리를 줍니다. 손끝으로 옆면을 긁는 느낌만 사용하세요.'},
+      {q:'중지가 실밥을 단단히 잡고 있나요?', correct:'YES', fb:'중지가 마지막까지 공을 끌며 회전을 만듭니다.'}
+    ],
+    practice:{ routine:[
+      '① 회전(③) 모드에서 슬라이더 회전축이 포심과 얼마나 다른지 비교한다.',
+      '② 실제 공을 쥐고 중지로 옆면을 긁는 느낌을 천천히 확인한다 (던지지 않고 그립만).',
+      '③ 지도자와 함께할 때만 실제 투구 연습을 한다.'
+    ]},
+    safety:'변화구는 성장기 팔꿈치·손목에 부담이 될 수 있습니다. 그립과 원리 이해를 먼저 하고, 실제 반복 투구는 반드시 지도자와 함께 하세요.'
+  },
+
+  curveball: {
+    id:'curveball', phase:1, nameKo:'커브볼', nameEn:'Curveball',
+    family:'BREAKING', difficulty:4,
+    summary:'큰 포물선을 그리며 위에서 아래로 뚝 떨어지는 공.',
+    principle:'포심과 정반대인 톱스핀(정회전)을 겁니다. 톱스핀이 걸린 공은 마그누스 힘이 아래로 작용해서 중력과 힘을 합쳐 훨씬 크게 떨어집니다. 중지를 실밥에 걸고 공을 앞으로 "굴려 넘기듯" 놓는 것이 핵심입니다.',
+    grip:{
+      ballRotation:[0.8,0,0.3],
+      fingers:{
+        index:{pos:[0.14,0.88,0.40]},
+        middle:{pos:[-0.16,0.88,0.36], main:true},
+        ring:{pos:[-0.70,0.45,0.40]},
+        pinky:{pos:[-0.92,-0.05,0.28]},
+        thumb:{pos:[-0.02,-0.88,-0.30], main:true}
+      },
+      note:'중지를 실밥에 단단히 걸치는 것이 핵심입니다. 검지는 중지 옆에 나란히 붙이고, 엄지는 공 아래 뒤쪽 실밥에 둡니다.'
+    },
+    release:{ thumbTiming:0.55, fingerTiming:0.80,
+      fingers:{
+        index:{role:'press', timing:0.82}, middle:{role:'snap', timing:0.80},
+        ring:{role:'hold',   timing:0.72}, pinky:{role:'hold',  timing:0.70},
+        thumb:{role:'snap',  timing:0.55}
+      },
+      note:'공을 놓을 때 중지가 실밥을 앞으로 굴려 넘기며 톱스핀을 만듭니다. 엄지는 아래에서 위로 튕겨 올라옵니다. 과도한 손목 비틀기는 절대 금물 — 회전 "원리"를 이해하는 것이 목적입니다.' },
+    spin:{ axis:[0.95,0.2,0.1], speed:0.85, rpm:2600, label:'톱스핀 (정회전)',
+      note:'포심과 회전 방향이 정반대입니다. 회전축 화살표를 포심과 비교해 보세요.' },
+    motion:{ armSlot:66, releaseHeight:1.04 },
+    trajectory:{ start:[0,1.85,0.5], c1:[0,2.35,5], c2:[0.05,1.70,12], end:[0.10,0.45,17.6], speedFactor:0.85,
+      note:'살짝 떠올랐다가 큰 낙차로 떨어지는 무지개 궤적입니다.' },
+    coaching:[
+      {q:'중지가 실밥에 단단히 걸려 있나요?', correct:'YES', fb:'커브는 중지의 공입니다. 중지가 실밥을 굴려 넘기며 톱스핀을 만듭니다.'},
+      {q:'손목을 과하게 비틀어 던지려고 하나요?', correct:'NO', fb:'성장기에는 손목 비틀기 대신 회전 원리 이해가 목표입니다. 실제 투구는 지도자와 함께!'},
+      {q:'포심과 회전 방향이 반대라는 것을 회전(③) 모드에서 확인했나요?', correct:'YES', fb:'백스핀 vs 톱스핀 차이가 커브 낙차의 전부입니다.'}
+    ],
+    practice:{ routine:[
+      '① 회전(③) 모드에서 포심(백스핀) → 커브(톱스핀)를 번갈아 보며 방향 차이를 익힌다.',
+      '② 실제 공으로 그립만 쥐어보고 중지 위치를 확인한다.',
+      '③ 공을 앞으로 살짝 굴려 넘기며(토스) 톱스핀이 걸리는지 관찰한다.',
+      '④ 실제 커브 투구 연습은 반드시 지도자와 함께 진행한다.'
+    ]},
+    safety:'커브볼의 과도한 손목 비틀기와 반복 연습은 성장기 팔에 무리가 됩니다. 이 프로그램은 회전 원리 이해가 목적이며, 실전 연습은 지도자와 함께 하세요.'
+  },
+
+  circleChange: {
+    id:'circleChange', phase:1, nameKo:'서클 체인지업', nameEn:'Circle Changeup',
+    family:'OFFSPEED', difficulty:3,
+    summary:'패스트볼과 똑같은 폼으로 던지지만 훨씬 느리게 가는 속임수 공.',
+    principle:'엄지와 검지로 공 옆에 동그라미(OK 사인)를 만들고 나머지 세 손가락으로 공을 감쌉니다. 힘이 좋은 검지·중지 대신 약한 손가락들로 던지게 되어 회전과 속도가 자연스럽게 줄어듭니다. 타자는 패스트볼 폼을 보고 스윙하지만 공은 늦게 도착합니다.',
+    grip:{
+      ballRotation:[0,1.2,0],
+      fingers:{
+        index:{pos:[0.82,-0.28,0.30], main:true},
+        middle:{pos:[-0.02,0.90,0.36], main:true},
+        ring:{pos:[-0.50,0.72,0.40], main:true},
+        pinky:{pos:[-0.88,0.22,0.30]},
+        thumb:{pos:[0.72,-0.60,0.28], main:true}
+      },
+      note:'엄지와 검지가 공 옆면에서 동그라미(서클)를 만들고, 중지·약지가 공 위를 안정적으로 지지합니다.'
+    },
+    release:{ thumbTiming:0.68, fingerTiming:0.88,
+      fingers:{
+        index:{role:'loose', timing:0.50}, middle:{role:'press', timing:0.88},
+        ring:{role:'press',  timing:0.87}, pinky:{role:'hold',   timing:0.75},
+        thumb:{role:'hold',  timing:0.70}
+      },
+      note:'패스트볼과 똑같은 팔 스피드로 던지는 것이 가장 중요합니다. 검지는 동그라미 안에서 힘을 빼고, 중지·약지가 부드럽게 공을 굴려 보냅니다.' },
+    spin:{ axis:[-0.8,-0.5,0.2], speed:0.6, rpm:1750, label:'느린 백스핀',
+      note:'회전수가 눈에 띄게 적습니다. 회전이 약하면 공을 떠받치는 힘도 약해져 더 가라앉습니다.' },
+    motion:{ armSlot:58, releaseHeight:0.98 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0,1.70,6], c2:[-0.10,1.35,12], end:[-0.30,0.60,17.6], speedFactor:0.78,
+      note:'패스트볼보다 눈에 띄게 느리고, 팔 쪽으로 살짝 휘며 가라앉습니다. 재생 속도 차이를 느껴보세요.' },
+    coaching:[
+      {q:'엄지와 검지가 공 옆에서 동그라미(OK 모양)를 만들고 있나요?', correct:'YES', fb:'서클 체인지업의 이름이 된 핵심 그립입니다.'},
+      {q:'검지에 힘을 주어 공을 밀고 있나요?', correct:'NO', fb:'검지는 동그라미 안에서 쉬게 하세요. 힘을 빼는 것이 이 공의 비밀입니다.'},
+      {q:'중지와 약지가 공 위를 안정적으로 지지하나요?', correct:'YES', fb:'세 손가락이 공을 부드럽게 감싸야 컨트롤이 유지됩니다.'},
+      {q:'일부러 팔을 천천히 휘두르나요?', correct:'NO', fb:'팔은 패스트볼과 똑같이! 그립이 속도를 줄여줍니다. 팔을 늦추면 타자가 알아챕니다.'}
+    ],
+    practice:{ routine:[
+      '① 손이 작으면 동그라미가 어려울 수 있어요. 검지를 공 옆에 대는 것부터 시작한다.',
+      '② 포심 → 체인지업 그립 전환을 글러브 안에서 빠르게 반복 연습한다.',
+      '③ 캐치볼에서 팔 스피드는 그대로 두고 그립만 바꿔 속도 차이를 관찰한다.'
+    ]}
+  },
+
+  /* ── Phase 2 확장 구종 (14구종 체계 완성) ───────────────────
+     새 구종 추가 시 같은 필드 구조로 데이터만 넣으면 자동 동작한다. */
+
+  sinker: {
+    id:'sinker', phase:1, nameKo:'싱커', nameEn:'Sinker', family:'FASTBALL', difficulty:3,
+    summary:'투심보다 더 팔 쪽으로 휘며 무겁게 가라앉는 패스트볼.',
+    principle:'투심 그립에서 공을 조금 더 깊게 쥐고 검지 쪽으로 눌러 던지면 회전축이 크게 기울고 회전수도 줄어듭니다. 공을 떠받치는 힘이 약해지고 옆으로 밀리는 힘이 커져서, 빠르지만 무겁게 팔 쪽으로 가라앉는 공이 됩니다. 땅볼을 유도하는 대표 구종입니다.',
+    grip:{
+      ballRotation:[0.2,Math.PI/2,0],
+      fingers:{
+        index:{pos:[0.18,0.86,0.40], main:true},
+        middle:{pos:[-0.08,0.88,0.38], main:true},
+        ring:{pos:[-0.66,0.50,0.42]},
+        pinky:{pos:[-0.90,0.02,0.30]},
+        thumb:{pos:[0.05,-0.95,0.24], main:true}
+      },
+      note:'투심처럼 좁은 두 실밥 위에 손가락을 올리되, 공을 살짝 더 깊게 쥐고 검지 쪽에 무게를 둡니다.'
+    },
+    release:{ thumbTiming:0.60, fingerTiming:0.87,
+      fingers:{
+        index:{role:'press', timing:0.87}, middle:{role:'hold', timing:0.78},
+        ring:{role:'hold', timing:0.70}, pinky:{role:'hold', timing:0.68},
+        thumb:{role:'release', timing:0.60}
+      },
+      note:'검지가 마지막까지 공을 눌러주며 손목이 자연스럽게 안쪽으로 넘어갑니다. 억지로 비틀지 않아도 그립이 가라앉는 회전을 만듭니다.' },
+    spin:{ axis:[-0.75,-0.55,0.2], speed:0.85, rpm:1900, label:'많이 기울어진 백스핀',
+      note:'투심보다 회전축이 더 눕고 회전수가 적습니다. 덜 떠받쳐지니 더 가라앉습니다.' },
+    motion:{ armSlot:54, releaseHeight:0.94 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0,1.68,6], c2:[-0.22,1.35,12], end:[-0.45,0.55,17.6], speedFactor:0.95,
+      note:'팔 쪽(-X)으로 휘며 홈플레이트 근처에서 무겁게 가라앉습니다. 땅볼 유도용.' },
+    coaching:[
+      {q:'투심보다 공을 조금 더 깊게 쥐었나요?', correct:'YES', fb:'깊은 그립이 회전을 줄여 가라앉는 움직임을 만듭니다.'},
+      {q:'검지 쪽에 힘의 중심이 있나요?', correct:'YES', fb:'검지 쪽 압력이 싱커의 기울어진 회전축을 만듭니다.'},
+      {q:'손목을 억지로 안쪽으로 비틀고 있나요?', correct:'NO', fb:'비틀기는 금물! 그립과 손끝 압력만으로 충분합니다.'}
+    ],
+    practice:{ routine:[
+      '① 투심 → 싱커 그립을 번갈아 쥐며 깊이 차이를 손에 익힌다.',
+      '② 회전(③) 모드에서 투심과 싱커의 회전축·회전수 차이를 비교한다.',
+      '③ 캐치볼에서 공이 무겁게 떨어지는 느낌을 관찰한다.'
+    ]}
+  },
+
+  sweeper: {
+    id:'sweeper', phase:1, nameKo:'스위퍼', nameEn:'Sweeper', family:'BREAKING', difficulty:4,
+    summary:'슬라이더보다 훨씬 크게 옆으로 쓸려 나가는 최신 유행 변화구.',
+    principle:'회전축을 거의 눕혀서 옆 방향 회전 성분을 극대화하면, 마그누스 힘이 대부분 가로로 작용합니다. 낙차는 작지만 좌우로 빗자루로 쓸듯(sweep) 크게 휘어서, 타자 눈에는 공이 옆으로 미끄러져 사라지는 것처럼 보입니다.',
+    grip:{
+      ballRotation:[0.3,0.9,0],
+      fingers:{
+        index:{pos:[-0.14,0.83,0.44], main:true},
+        middle:{pos:[-0.50,0.70,0.42], main:true},
+        ring:{pos:[-0.86,0.22,0.40]},
+        pinky:{pos:[-0.95,-0.26,0.24]},
+        thumb:{pos:[0.32,-0.88,0.16], main:true}
+      },
+      note:'슬라이더보다 손가락을 더 바깥쪽 실밥에 걸치고, 엄지를 반대쪽으로 밀어 회전축을 눕힐 준비를 합니다.'
+    },
+    release:{ thumbTiming:0.56, fingerTiming:0.83,
+      fingers:{
+        index:{role:'press', timing:0.80}, middle:{role:'snap', timing:0.83},
+        ring:{role:'hold', timing:0.72}, pinky:{role:'hold', timing:0.70},
+        thumb:{role:'release', timing:0.56}
+      },
+      note:'중지가 공 옆면을 옆으로 길게 쓸어내듯 긁습니다. 슬라이더보다 옆 방향 긁기가 더 큽니다.' },
+    spin:{ axis:[0.1,0.9,0.35], speed:0.88, rpm:2450, label:'옆으로 눕힌 사이드 스핀',
+      note:'회전축이 거의 세워져(지면과 수직에 가깝게) 옆 방향 힘이 최대가 됩니다.' },
+    motion:{ armSlot:52, releaseHeight:0.98 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0,1.68,6], c2:[0.32,1.38,12], end:[0.95,0.85,17.6], speedFactor:0.88,
+      note:'낙차보다 가로 이동이 압도적으로 큰 궤적. 글러브 쪽(+X)으로 크게 쓸려 나갑니다.' },
+    coaching:[
+      {q:'슬라이더보다 손가락이 더 바깥 실밥에 걸쳐 있나요?', correct:'YES', fb:'바깥 그립이 눕힌 회전축의 시작입니다.'},
+      {q:'공을 아래로 내리꽂으려 하나요?', correct:'NO', fb:'스위퍼는 옆으로 쓸어내는 공입니다. 낙차 욕심은 금물.'},
+      {q:'회전(③) 모드에서 슬라이더와 회전축 차이를 확인했나요?', correct:'YES', fb:'축이 눕을수록 가로 무브먼트가 커집니다.'}
+    ],
+    practice:{ routine:[
+      '① 슬라이더 → 스위퍼 그립을 비교하며 손가락 위치 차이를 익힌다.',
+      '② 궤적(⑤) 모드에서 두 구종의 가로 이동량을 비교한다.',
+      '③ 실전 연습은 지도자와 함께 진행한다.'
+    ]},
+    safety:'변화구는 성장기 팔꿈치·손목에 부담이 될 수 있습니다. 그립과 원리 이해를 먼저 하고, 실제 반복 투구는 반드시 지도자와 함께 하세요.'
+  },
+
+  knuckleCurve: {
+    id:'knuckleCurve', phase:1, nameKo:'너클 커브', nameEn:'Knuckle Curve', family:'BREAKING', difficulty:4,
+    summary:'검지를 구부려 손톱을 공에 대고 던지는, 더 날카로운 커브.',
+    principle:'일반 커브에서 검지를 구부려 손톱 끝을 공에 대면(너클 그립), 릴리스 때 검지가 방해하지 않아 중지가 만드는 톱스핀이 더 순수해집니다. 회전 효율이 올라가 같은 힘으로 더 날카로운 낙차를 만들 수 있습니다.',
+    grip:{
+      ballRotation:[0.8,0.2,0.3],
+      fingers:{
+        index:{pos:[0.05,0.92,0.28], main:true},
+        middle:{pos:[-0.20,0.87,0.36], main:true},
+        ring:{pos:[-0.70,0.45,0.40]},
+        pinky:{pos:[-0.92,-0.05,0.28]},
+        thumb:{pos:[0.02,-0.86,-0.32], main:true}
+      },
+      note:'검지를 갈고리처럼 구부려 손톱을 실밥 근처에 세워 대고, 중지는 커브처럼 실밥에 단단히 걸칩니다.'
+    },
+    release:{ thumbTiming:0.55, fingerTiming:0.80,
+      fingers:{
+        index:{role:'hold', timing:0.76}, middle:{role:'snap', timing:0.80},
+        ring:{role:'hold', timing:0.72}, pinky:{role:'hold', timing:0.70},
+        thumb:{role:'snap', timing:0.55}
+      },
+      note:'구부린 검지는 끝까지 형태를 유지하고, 중지 혼자 실밥을 굴려 넘기며 순수한 톱스핀을 만듭니다.' },
+    spin:{ axis:[0.95,0.15,0.15], speed:0.86, rpm:2650, label:'날카로운 톱스핀',
+      note:'일반 커브보다 회전 효율이 높아 같은 팔 스윙으로 더 많은 회전이 걸립니다.' },
+    motion:{ armSlot:68, releaseHeight:1.04 },
+    trajectory:{ start:[0,1.85,0.5], c1:[0,2.30,5], c2:[0.05,1.62,12], end:[0.05,0.40,17.6], speedFactor:0.84,
+      note:'커브보다 살짝 늦게, 더 날카롭게 떨어집니다.' },
+    coaching:[
+      {q:'검지가 구부러져 손톱이 공에 닿아 있나요?', correct:'YES', fb:'너클 커브의 이름이 된 핵심 그립입니다.'},
+      {q:'구부린 검지로 공을 밀어 던지나요?', correct:'NO', fb:'검지는 고정만! 회전은 중지가 만듭니다.'},
+      {q:'손목을 과하게 비틀고 있나요?', correct:'NO', fb:'성장기에는 원리 이해가 목표입니다. 실전은 지도자와 함께!'}
+    ],
+    practice:{ routine:[
+      '① 검지를 구부려 손톱을 대는 그립만 먼저 연습한다 (불편하면 일반 커브 그립 유지).',
+      '② 회전(③) 모드에서 커브와 회전수 차이를 비교한다.',
+      '③ 실제 투구 연습은 반드시 지도자와 함께 진행한다.'
+    ]},
+    safety:'커브 계열의 과도한 반복 연습은 성장기 팔에 무리가 됩니다. 회전 원리 이해가 목적이며, 실전 연습은 지도자와 함께 하세요.'
+  },
+
+  forkball: {
+    id:'forkball', phase:1, nameKo:'포크볼', nameEn:'Forkball', family:'BREAKING', difficulty:4,
+    summary:'검지와 중지 사이에 공을 끼워 회전을 죽이고 뚝 떨어뜨리는 공.',
+    principle:'검지와 중지를 포크처럼 크게 벌려 공을 끼우면, 릴리스 때 손가락이 실밥을 긁지 못해 회전이 거의 걸리지 않습니다. 회전이 없으면 공을 떠받치는 마그누스 힘도 사라져서, 홈플레이트 앞에서 뚝 떨어집니다.',
+    grip:{
+      ballRotation:[0,0.6,0],
+      fingers:{
+        index:{pos:[0.55,0.72,0.42], main:true},
+        middle:{pos:[-0.55,0.72,0.42], main:true},
+        ring:{pos:[-0.88,0.14,0.34]},
+        pinky:{pos:[-0.95,-0.30,0.20]},
+        thumb:{pos:[0.05,-0.92,0.28], main:true}
+      },
+      note:'검지와 중지를 V자로 크게 벌려 공을 사이에 끼웁니다. 손가락 안쪽 면으로 공을 잡는 느낌입니다.'
+    },
+    release:{ thumbTiming:0.62, fingerTiming:0.84,
+      fingers:{
+        index:{role:'hold', timing:0.82}, middle:{role:'hold', timing:0.82},
+        ring:{role:'hold', timing:0.72}, pinky:{role:'hold', timing:0.70},
+        thumb:{role:'release', timing:0.62}
+      },
+      note:'손가락이 공을 긁지 않고, 벌린 사이로 공이 미끄러져 빠져나갑니다. 그래서 회전이 죽습니다.' },
+    spin:{ axis:[-1,0,0], speed:0.30, rpm:900, label:'아주 느린 회전 (무회전에 가까움)',
+      note:'회전(③) 모드에서 실밥이 천천히 도는 것을 보세요. 떠받치는 힘이 없어 뚝 떨어집니다.' },
+    motion:{ armSlot:58, releaseHeight:0.98 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0,1.70,7], c2:[0,1.35,13], end:[-0.05,0.35,17.6], speedFactor:0.82,
+      note:'패스트볼처럼 오다가 홈플레이트 앞에서 갑자기 떨어집니다.' },
+    coaching:[
+      {q:'검지와 중지 사이에 공이 끼워져 있나요?', correct:'YES', fb:'포크 그립의 전부입니다. 손가락이 실밥을 못 긁게 하는 것이 목적.'},
+      {q:'손가락을 무리하게 벌려 통증이 있나요?', correct:'NO', fb:'아프면 즉시 중단! 손이 작으면 스플리터(좁은 그립)부터 시작하세요.'},
+      {q:'릴리스 때 손끝으로 공을 긁으려 하나요?', correct:'NO', fb:'긁지 않는 것이 포크볼입니다. 공이 미끄러져 나가게 두세요.'}
+    ],
+    practice:{ routine:[
+      '① 공 없이 손가락 벌리기 스트레칭부터 천천히 (절대 무리하지 않기).',
+      '② 그립만 쥐어보고 손 크기에 맞는지 확인한다 — 힘들면 스플리터로.',
+      '③ 실제 투구는 손이 충분히 자란 뒤 지도자와 함께.'
+    ]},
+    safety:'포크볼은 손가락을 크게 벌려야 해서 성장기 손·팔꿈치에 부담이 큽니다. 이 프로그램에서는 원리 이해만 하고, 실제 연습은 손이 자란 뒤 지도자와 상의하세요.'
+  },
+
+  splitter: {
+    id:'splitter', phase:1, nameKo:'스플리터', nameEn:'Splitter', family:'BREAKING', difficulty:4,
+    summary:'포크볼보다 좁게 벌려 빠르게 던지는 "떨어지는 패스트볼".',
+    principle:'포크볼처럼 손가락을 벌리되 그 폭을 줄이면, 어느 정도 스피드를 유지하면서 회전만 줄일 수 있습니다. 패스트볼과 거의 같은 속도로 날아오다가 마지막에 미끄러지듯 가라앉아, 타자의 방망이 밑을 지나갑니다.',
+    grip:{
+      ballRotation:[0,0.5,0.1],
+      fingers:{
+        index:{pos:[0.42,0.80,0.40], main:true},
+        middle:{pos:[-0.42,0.80,0.40], main:true},
+        ring:{pos:[-0.84,0.24,0.36]},
+        pinky:{pos:[-0.94,-0.22,0.22]},
+        thumb:{pos:[0,-0.94,0.26], main:true}
+      },
+      note:'검지·중지를 실밥 바깥쪽으로 벌려 걸치되, 포크볼만큼 크게 벌리지는 않습니다. 엄지는 아래 중앙.'
+    },
+    release:{ thumbTiming:0.62, fingerTiming:0.85,
+      fingers:{
+        index:{role:'press', timing:0.85}, middle:{role:'press', timing:0.85},
+        ring:{role:'hold', timing:0.70}, pinky:{role:'hold', timing:0.68},
+        thumb:{role:'release', timing:0.62}
+      },
+      note:'패스트볼과 똑같이 강하게 뿌리지만, 벌어진 손가락이 실밥을 덜 긁어 회전이 줄어듭니다.' },
+    spin:{ axis:[-0.95,-0.2,0.15], speed:0.50, rpm:1300, label:'느린 백스핀',
+      note:'포심의 절반 수준 회전. 속도는 빠른데 안 떠받쳐지니 늦게 뚝 가라앉습니다.' },
+    motion:{ armSlot:58, releaseHeight:0.98 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0,1.72,6], c2:[-0.08,1.42,12], end:[-0.15,0.50,17.6], speedFactor:0.90,
+      note:'포심과 거의 같은 속도감으로 오다가 마지막에 가라앉는 것이 핵심.' },
+    coaching:[
+      {q:'포크볼보다 손가락 간격이 좁은가요?', correct:'YES', fb:'좁은 만큼 스피드가 살아 있는 것이 스플리터입니다.'},
+      {q:'팔 스윙이 패스트볼과 똑같은가요?', correct:'YES', fb:'같은 폼에서 나오는 낙차가 타자를 속입니다.'},
+      {q:'손가락 벌리기가 아프거나 무리스러운가요?', correct:'NO', fb:'아프면 즉시 중단하고 체인지업 계열로 대체하세요.'}
+    ],
+    practice:{ routine:[
+      '① 포심 → 스플리터 그립 전환을 연습하며 벌림 폭을 확인한다.',
+      '② 궤적(⑤) 모드에서 포심과 낙하 시점 차이를 비교한다.',
+      '③ 실제 투구는 지도자와 함께, 손에 무리가 없는 범위에서.'
+    ]},
+    safety:'벌려 쥐는 그립은 성장기 손에 부담이 될 수 있습니다. 통증이 있으면 즉시 중단하고 지도자와 상의하세요.'
+  },
+
+  vulcanChange: {
+    id:'vulcanChange', phase:1, nameKo:'벌칸 체인지업', nameEn:'Vulcan Changeup', family:'OFFSPEED', difficulty:3,
+    summary:'중지와 약지 사이에 공을 끼우는 "벌칸 인사" 모양 체인지업.',
+    principle:'중지와 약지 사이에 공을 끼우면(스타트렉 벌칸 인사 손모양) 힘 좋은 검지·중지가 공을 제대로 못 밀게 됩니다. 서클 체인지업과 같은 원리로 속도와 회전이 줄지만, 손이 작아 서클을 만들기 어려운 사람도 쉽게 쥘 수 있습니다.',
+    grip:{
+      ballRotation:[0,1.1,0.1],
+      fingers:{
+        index:{pos:[0.72,0.45,0.35]},
+        middle:{pos:[0.30,0.82,0.40], main:true},
+        ring:{pos:[-0.48,0.75,0.40], main:true},
+        pinky:{pos:[-0.90,0.10,0.28]},
+        thumb:{pos:[0.12,-0.92,0.28], main:true}
+      },
+      note:'중지와 약지를 V자로 벌려 그 사이에 공을 끼웁니다. 검지는 옆에서 살짝 거들 뿐입니다.'
+    },
+    release:{ thumbTiming:0.68, fingerTiming:0.87,
+      fingers:{
+        index:{role:'hold', timing:0.75}, middle:{role:'press', timing:0.87},
+        ring:{role:'press', timing:0.86}, pinky:{role:'hold', timing:0.72},
+        thumb:{role:'hold', timing:0.70}
+      },
+      note:'패스트볼과 같은 팔 스피드로! 중지·약지가 공을 부드럽게 굴려 보내며 자연스럽게 느려집니다.' },
+    spin:{ axis:[-0.8,-0.5,0.25], speed:0.55, rpm:1600, label:'느린 백스핀',
+      note:'서클 체인지업과 비슷한 느린 회전. 팔 쪽으로 살짝 휘며 가라앉습니다.' },
+    motion:{ armSlot:58, releaseHeight:0.98 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0,1.70,6], c2:[-0.15,1.35,12], end:[-0.35,0.55,17.6], speedFactor:0.77,
+      note:'패스트볼 폼에서 나오는 느린 공. 서클 체인지업과 비교해 보세요.' },
+    coaching:[
+      {q:'중지와 약지 사이에 공이 끼워져 있나요?', correct:'YES', fb:'벌칸 그립의 핵심입니다. 벌칸 인사 모양이 맞아요.'},
+      {q:'검지에 힘을 주고 있나요?', correct:'NO', fb:'검지는 쉬게 하세요. 힘을 빼는 것이 체인지업의 비밀.'},
+      {q:'일부러 팔을 천천히 휘두르나요?', correct:'NO', fb:'팔은 패스트볼과 똑같이! 그립이 속도를 줄여줍니다.'}
+    ],
+    practice:{ routine:[
+      '① 벌칸 인사 손모양(중지·약지 벌리기)을 공 없이 연습한다.',
+      '② 서클 체인지업과 벌칸 그립을 모두 쥐어보고 편한 쪽을 고른다.',
+      '③ 캐치볼에서 팔 스피드는 유지하고 그립만 바꿔 속도 차이를 관찰한다.'
+    ]}
+  },
+
+  knuckleball: {
+    id:'knuckleball', phase:1, nameKo:'너클볼', nameEn:'Knuckleball', family:'SPECIAL', difficulty:5,
+    summary:'회전을 없애 바람 따라 흔들리며 날아가는 마구.',
+    principle:'손끝(또는 손톱)으로 공을 밀어내 회전을 거의 0으로 만들면, 실밥 주변의 공기 흐름이 불규칙하게 바뀌면서 공이 좌우아래로 예측 불가능하게 흔들립니다. 던지는 투수도, 받는 포수도, 치는 타자도 어디로 갈지 모르는 유일한 구종입니다.',
+    grip:{
+      ballRotation:[0.1,0.3,0],
+      fingers:{
+        index:{pos:[0.16,0.90,0.28], main:true},
+        middle:{pos:[-0.16,0.90,0.28], main:true},
+        ring:{pos:[-0.76,0.40,0.34]},
+        pinky:{pos:[-0.93,-0.10,0.26]},
+        thumb:{pos:[0.05,-0.92,0.30], main:true}
+      },
+      note:'검지·중지 끝을 세워 손톱과 손끝으로 공을 찍듯이 댑니다. 손바닥에서 공을 최대한 띄웁니다.'
+    },
+    release:{ thumbTiming:0.68, fingerTiming:0.86,
+      fingers:{
+        index:{role:'loose', timing:0.78}, middle:{role:'loose', timing:0.78},
+        ring:{role:'hold', timing:0.72}, pinky:{role:'hold', timing:0.70},
+        thumb:{role:'hold', timing:0.68}
+      },
+      note:'손끝으로 공을 "밀어서 놓아주기". 긁으면 회전이 걸려 실패입니다. 밀어내는 순간 손톱이 마지막 회전까지 상쇄합니다.' },
+    spin:{ axis:[0.3,0.5,0.8], speed:0.08, rpm:300, label:'거의 무회전 — 공기 따라 흔들림',
+      note:'회전(③) 모드에서 실밥이 멈춘 듯 보이는 것이 정상입니다. 이 무회전이 나비처럼 흔들리는 비밀.' },
+    motion:{ armSlot:56, releaseHeight:1.0 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0.18,1.72,6], c2:[-0.22,1.30,12], end:[0.10,0.60,17.6], speedFactor:0.70,
+      note:'실제로는 매번 다르게 흔들립니다. 화면 궤적은 한 가지 예시일 뿐!' },
+    coaching:[
+      {q:'손끝(손톱)으로 공을 세워 잡았나요?', correct:'YES', fb:'손바닥에서 띄우는 것이 무회전의 시작입니다.'},
+      {q:'릴리스 때 손끝으로 실밥을 긁고 있나요?', correct:'NO', fb:'긁으면 회전이 걸립니다. 밀어서 놓아주세요.'},
+      {q:'공이 매번 똑같이 가기를 기대하나요?', correct:'NO', fb:'너클볼은 투수도 어디로 갈지 모릅니다. 그것이 매력!'}
+    ],
+    practice:{ routine:[
+      '① 가까운 거리(3~5m)에서 손끝으로 밀어 던지며 공 로고가 안 도는지 관찰한다.',
+      '② 회전이 최소가 되는 자신만의 손끝 감각을 찾는다.',
+      '③ 벽이나 네트에 대고 연습 — 포수도 잡기 힘든 공이니까!'
+    ]}
+  },
+
+  screwball: {
+    id:'screwball', phase:1, nameKo:'스크류볼', nameEn:'Screwball', family:'SPECIAL', difficulty:5,
+    summary:'슬라이더와 반대로, 팔 안쪽 방향으로 휘어 나가는 역회전 변화구.',
+    principle:'보통 변화구와 반대로 손을 안쪽으로 돌려 공 안쪽 면을 긁으면, 슬라이더와 반대 방향 사이드 스핀이 걸립니다. 우투수의 공이 왼쪽(팔 쪽)으로 휘어 나가서, 반대손 타자의 바깥쪽으로 도망가는 희귀한 공입니다.',
+    grip:{
+      ballRotation:[0.2,-0.6,0.2],
+      fingers:{
+        index:{pos:[0.38,0.82,0.38], main:true},
+        middle:{pos:[0.02,0.90,0.34], main:true},
+        ring:{pos:[-0.58,0.62,0.40]},
+        pinky:{pos:[-0.90,0.08,0.28]},
+        thumb:{pos:[0.15,-0.92,0.22], main:true}
+      },
+      note:'검지·중지를 공 안쪽(엄지 쪽) 실밥에 걸칩니다. 슬라이더와 좌우 반대 개념입니다.'
+    },
+    release:{ thumbTiming:0.58, fingerTiming:0.83,
+      fingers:{
+        index:{role:'press', timing:0.83}, middle:{role:'snap', timing:0.82},
+        ring:{role:'hold', timing:0.72}, pinky:{role:'hold', timing:0.70},
+        thumb:{role:'release', timing:0.58}
+      },
+      note:'중지가 공의 안쪽 면을 긁으며 역방향 회전을 만듭니다. 실제 투구에서는 팔에 부담이 큰 동작으로, 원리 이해만!' },
+    spin:{ axis:[-0.3,-0.8,0.4], speed:0.85, rpm:2200, label:'슬라이더와 반대인 사이드 스핀',
+      note:'회전(③) 모드에서 슬라이더와 축 방향을 비교해 보세요. 정확히 거울상입니다.' },
+    motion:{ armSlot:60, releaseHeight:1.0 },
+    trajectory:{ start:[0,1.8,0.5], c1:[0,1.70,6], c2:[-0.28,1.40,12], end:[-0.75,0.65,17.6], speedFactor:0.87,
+      note:'팔 쪽(-X)으로 크게 휘는 역방향 궤적. 슬라이더 궤적과 나란히 비교해 보세요.' },
+    coaching:[
+      {q:'슬라이더와 좌우가 반대라는 것을 이해했나요?', correct:'YES', fb:'스크류볼 = 거울에 비친 슬라이더입니다.'},
+      {q:'실제로 손목을 안쪽으로 비틀어 던져볼 생각인가요?', correct:'NO', fb:'스크류볼은 프로도 팔 부담 때문에 잘 안 던집니다. 원리 이해만!'},
+      {q:'회전(③) 모드에서 슬라이더와 축을 비교했나요?', correct:'YES', fb:'회전축 방향이 궤적 방향을 결정한다는 최고의 교재입니다.'}
+    ],
+    practice:{ routine:[
+      '① 회전(③) 모드에서 슬라이더 ↔ 스크류볼 회전축을 번갈아 관찰한다.',
+      '② 궤적(⑤) 모드에서 두 구종이 반대로 휘는 것을 확인한다.',
+      '③ 실제 투구 연습은 하지 않는다 — 관찰·이해 전용 구종.'
+    ]},
+    safety:'스크류볼은 팔꿈치를 안쪽으로 비트는 동작 때문에 프로 선수도 기피하는 구종입니다. 절대 실제로 반복 연습하지 말고, 회전 원리 학습용으로만 보세요.'
+  }
+};
+
+const FAMILY_NAMES = { FASTBALL:'패스트볼', BREAKING:'변화구', OFFSPEED:'오프스피드', SPECIAL:'특수 구종' };
+
+/* ═══════════════ 전역 상태 ═══════════════ */
+const state = {
+  topMode:'LEARN',          // LEARN | PRACTICE
+  currentPitch:'fourSeam',
+  subMode:'GRIP',           // GRIP | RELEASE | SPIN | MOTION | PATH
+  cameraView:'GRIP',
+  speed:1.0,
+  playing:false,
+  focusFinger:null,         // 릴리스 확대 관찰 중인 손가락
+  t:0                       // 0..1 애니메이션 진행도
+};
+const DUR = { RELEASE:3.2, MOTION:4.2, PATH:1.7 };   // 1x 기준 초
+
+/* ═══════════════ Three.js 기본 세팅 ═══════════════ */
+const viewport = document.getElementById('viewport');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0a0e18);
+scene.fog = new THREE.Fog(0x0a0e18, 30, 60);
+
+const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 200);
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+viewport.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+
+function resize(){
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  camera.aspect = w/h; camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', resize);
+
+scene.add(new THREE.HemisphereLight(0xcfe4ff, 0x30281c, 0.7));
+const sun = new THREE.DirectionalLight(0xffffff, 1.3);
+sun.position.set(4, 8, 3); scene.add(sun);
+const fill = new THREE.DirectionalLight(0x88aaff, 0.35);
+fill.position.set(-5, 3, -4); scene.add(fill);
+// 환경광(IBL): 피부·가죽 질감을 살리는 부드러운 실내광
+{
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.55;
+}
+
+/* ═══════════════ 야구공 (실밥 = 실제 3D 곡선) ═══════════════ */
+function seamCurvePoints(R, n=600){
+  // 야구공 실밥의 표준 파라메트릭 곡선 (t: 0→4π 닫힌 곡선)
+  const a = 0.44, pts = [];
+  for(let i=0; i<=n; i++){
+    const t = i/n * Math.PI*4;
+    const theta = Math.PI/2 - (Math.PI/2 - a)*Math.cos(t);
+    const phi = t/2 + a*Math.sin(2*t);
+    pts.push(new THREE.Vector3(
+      R*Math.sin(theta)*Math.cos(phi),
+      R*Math.cos(theta),
+      R*Math.sin(theta)*Math.sin(phi)
+    ));
+  }
+  return pts;
+}
+function createBaseball(R){
+  const g = new THREE.Group();
+  const leather = new THREE.Mesh(
+    new THREE.SphereGeometry(R, 48, 48),
+    new THREE.MeshStandardMaterial({color:0xf4efe4, roughness:0.55})
+  );
+  g.add(leather);
+  const curve = new THREE.CatmullRomCurve3(seamCurvePoints(R*0.995), true);
+  const seam = new THREE.Mesh(
+    new THREE.TubeGeometry(curve, 500, R*0.035, 8, true),
+    new THREE.MeshStandardMaterial({color:0xc62828, roughness:0.7})
+  );
+  g.add(seam);
+  return g;
+}
+
+/* ═══════════════ 텍스트 라벨 스프라이트 ═══════════════ */
+function makeLabel(text, color='#ffffff', size=44){
+  const cv = document.createElement('canvas');
+  const ctx = cv.getContext('2d');
+  ctx.font = `800 ${size}px Pretendard, "Malgun Gothic", sans-serif`;
+  const w = Math.ceil(ctx.measureText(text).width) + 36;
+  cv.width = w; cv.height = size + 28;
+  const c2 = cv.getContext('2d');
+  c2.fillStyle = 'rgba(10,14,24,0.75)';
+  c2.beginPath(); c2.roundRect(0,0,cv.width,cv.height,14); c2.fill();
+  c2.font = `800 ${size}px Pretendard, "Malgun Gothic", sans-serif`;
+  c2.fillStyle = color; c2.textBaseline='middle'; c2.textAlign='center';
+  c2.fillText(text, cv.width/2, cv.height/2+2);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, depthTest:false}));
+  const s = 0.0042;
+  sp.scale.set(cv.width*s, cv.height*s, 1);
+  return sp;
+}
+
+/* ═══════════════ 공+손 월드 (GRIP / RELEASE / SPIN) ═══════════════ */
+const ballWorld = new THREE.Group(); scene.add(ballWorld);
+const ball = createBaseball(1); ballWorld.add(ball);
+
+/* ── 리얼 스킨 텍스처: 관절 주름 · 손등 잔주름 · 손금 · 피부 결 ──
+   u(둘레): 0.25 = 손등쪽(약간 어둡게), 0.75 = 공에 닿는 안쪽(밝게, 주름/손금)
+   v(길이): 0 = 뿌리 → 1 = 손끝 */
+function makeSkinTexture(creases, palmLines){
+  const W = 256, H = 512;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, W, 0);
+  g.addColorStop(0.00,'#e4ae86'); g.addColorStop(0.25,'#dca67d');
+  g.addColorStop(0.50,'#e4ae86'); g.addColorStop(0.75,'#f1c8a8');
+  g.addColorStop(1.00,'#e4ae86');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // 손끝 쪽 혈색
+  const g2 = ctx.createLinearGradient(0, H, 0, 0);
+  g2.addColorStop(0,'rgba(255,190,170,0)'); g2.addColorStop(1,'rgba(255,190,170,0.28)');
+  ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
+  // 관절 주름(안쪽 3겹) + 손등 잔주름
+  for(const sj of creases){
+    const y = (1 - sj) * H;
+    for(const [dy, lw, al] of [[0,3.4,0.42],[-7,1.6,0.20],[7,1.6,0.20]]){
+      ctx.strokeStyle = `rgba(138,80,50,${al})`; ctx.lineWidth = lw;
+      ctx.beginPath();
+      ctx.moveTo(W*0.53, y+dy);
+      ctx.quadraticCurveTo(W*0.75, y+dy+4, W*0.97, y+dy);
+      ctx.stroke();
+    }
+    ctx.strokeStyle = 'rgba(150,95,60,0.16)'; ctx.lineWidth = 1.4;
+    for(let k = 0; k < 4; k++){
+      const y2 = y - 9 + k*6;
+      ctx.beginPath();
+      ctx.moveTo(W*0.09, y2);
+      ctx.quadraticCurveTo(W*0.25, y2+3, W*0.41, y2);
+      ctx.stroke();
+    }
+  }
+  // 손금 (손바닥 전용)
+  if(palmLines){
+    ctx.strokeStyle = 'rgba(150,90,55,0.35)'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(W*0.58,H*0.82); ctx.quadraticCurveTo(W*0.78,H*0.55, W*0.94,H*0.42); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(W*0.55,H*0.60); ctx.quadraticCurveTo(W*0.76,H*0.40, W*0.90,H*0.18); ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(W*0.62,H*0.90); ctx.quadraticCurveTo(W*0.72,H*0.72, W*0.86,H*0.68); ctx.stroke();
+  }
+  // 피부 결 노이즈
+  for(let i = 0; i < 700; i++){
+    ctx.fillStyle = Math.random() < 0.5 ? 'rgba(120,70,45,0.05)' : 'rgba(255,230,210,0.05)';
+    ctx.fillRect(Math.random()*W, Math.random()*H, 1.6, 1.2);
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  return tex;
+}
+const TEX_FINGER = makeSkinTexture([0.33,0.67], false);
+const TEX_THUMB  = makeSkinTexture([0.5], false);
+const TEX_PALM   = makeSkinTexture([], true);
+const SKIN        = new THREE.MeshStandardMaterial({color:0xe4ae86, roughness:0.65});
+const SKIN_FINGER = new THREE.MeshStandardMaterial({map:TEX_FINGER, bumpMap:TEX_FINGER, bumpScale:0.012, roughness:0.62, side:THREE.DoubleSide});
+const SKIN_THUMB  = new THREE.MeshStandardMaterial({map:TEX_THUMB,  bumpMap:TEX_THUMB,  bumpScale:0.012, roughness:0.62, side:THREE.DoubleSide});
+const SKIN_PALM   = new THREE.MeshStandardMaterial({map:TEX_PALM,   bumpMap:TEX_PALM,   bumpScale:0.010, roughness:0.66, side:THREE.DoubleSide});
+const NAIL        = new THREE.MeshStandardMaterial({color:0xf3d9c1, roughness:0.28});
+
+/* 단위벡터 구면 보간 — 손가락이 공 표면을 따라 감싸는 측지선 경로 */
+function slerpVec(a, b, s, out){
+  const d = THREE.MathUtils.clamp(a.dot(b), -1, 1);
+  const om = Math.acos(d);
+  if(om < 1e-4) return out.copy(a);
+  const so = Math.sin(om);
+  const fa = Math.sin((1-s)*om)/so, fb = Math.sin(s*om)/so;
+  return out.set(a.x*fa + b.x*fb, a.y*fa + b.y*fb, a.z*fa + b.z*fb);
+}
+
+/* 링 목록 → 매끈한 살 튜브 (타원 단면 + 공에 닿는 면 눌림) */
+function ringsToGeometry(rings, radial, flatten){
+  const pos = [], norm = [], uv = [], idx = [];
+  const p = new THREE.Vector3(), n = new THREE.Vector3();
+  for(const ring of rings){
+    for(let j = 0; j <= radial; j++){
+      const a = j/radial * Math.PI * 2;
+      const ca = Math.cos(a), sa = Math.sin(a);
+      const squash = sa < 0 ? (1 - flatten*(-sa)) : 1;    // 공에 닿는 면은 살이 눌려 납작
+      p.copy(ring.P)
+        .addScaledVector(ring.S, ca*ring.w)
+        .addScaledVector(ring.O, sa*ring.h*squash);
+      n.copy(ring.S).multiplyScalar(ca).addScaledVector(ring.O, sa).normalize();
+      pos.push(p.x, p.y, p.z); norm.push(n.x, n.y, n.z);
+      uv.push(j/radial, ring.v);
+    }
+  }
+  for(let i = 0; i < rings.length-1; i++){
+    for(let j = 0; j < radial; j++){
+      const a = i*(radial+1)+j, b = a + radial + 1;
+      idx.push(a, b, a+1, b, b+1, a+1);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal',   new THREE.Float32BufferAttribute(norm, 3));
+  g.setAttribute('uv',       new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  return g;
+}
+/* 튜브 양 끝을 둥글게 닫는 반구 링 */
+function capRings(ring, T, sign, n=5){
+  const out = [];
+  for(let k = 1; k <= n; k++){
+    const a = k/n * Math.PI/2;
+    out.push({
+      P: ring.P.clone().addScaledVector(T, sign*Math.sin(a)*ring.h*0.95),
+      S: ring.S, O: ring.O,
+      w: Math.max(ring.w*Math.cos(a), 0.001),
+      h: Math.max(ring.h*Math.cos(a), 0.001),
+      v: ring.v
+    });
+  }
+  return out;
+}
+
+/* 실제 손가락 하나: 곧은 마디가 관절에서 꺾이며 공을 감싸는 구조.
+   관절(PIP/DIP)은 공에서 살짝 떠서 볼록 튀어나오고, 손끝 지문 패드만 공에 닿는다. */
+function buildRealFinger(name, K, C){
+  const r = FINGER_R[name];
+  const isThumb = (name === 'thumb');
+  const uK = K.clone().normalize(), uC = C.clone().normalize();
+  const hugR = 1 + r*0.72;                        // 살이 공 표면에 닿는 중심선 반경
+  const jointsS = isThumb ? [0.5] : [0.33, 0.67]; // 곡선 파라미터상 관절 위치
+  const segsL = 46, radial = 20;
+  // 관절 매듭점: 뿌리(MCP) → PIP → DIP → 손끝. 관절은 공에서 띄우고 손끝 패드는 눌러 붙인다.
+  const jf = isThumb ? [0.52] : [0.40, 0.72];     // 측지선상 관절 비율
+  const tmp = new THREE.Vector3();
+  const knots = [K.clone()];
+  for(const f of jf){
+    slerpVec(uK, uC, f, tmp);
+    knots.push(tmp.clone().multiplyScalar(hugR*1.075));   // 관절이 볼록 솟음 → 마디는 직선
+  }
+  knots.push(uC.clone().multiplyScalar(hugR*0.98));       // 손끝 패드는 공에 눌림
+  const centerline = new THREE.CatmullRomCurve3(knots, false, 'centripetal');
+  const pts = centerline.getPoints(segsL);
+  const rings = [], frames = [];
+  for(let i = 0; i <= segsL; i++){
+    const s = i/segsL;
+    const T = new THREE.Vector3().subVectors(pts[Math.min(i+1,segsL)], pts[Math.max(i-1,0)]).normalize();
+    const S = new THREE.Vector3().crossVectors(T, pts[i].clone().normalize()).normalize();
+    const O = new THREE.Vector3().crossVectors(S, T).normalize();
+    let prof = 1 - 0.12*s;                                        // 뿌리→손끝 테이퍼
+    for(const js of jointsS){
+      prof += 0.055*Math.exp(-Math.pow((s-js)/0.055, 2));         // 관절 도톰
+      prof -= 0.050*Math.exp(-Math.pow((s-js)/0.016, 2));         // 관절 주름 파임
+    }
+    if(s > 0.86) prof *= 1 - 0.26*Math.pow((s-0.86)/0.14, 1.8);   // 손끝 (둥글게)
+    rings.push({P:pts[i], S, O, w:r*prof, h:r*0.84*prof, v:s});
+    frames.push({T, S, O});
+  }
+  const all = [...capRings(rings[0], frames[0].T, -1).reverse(), ...rings, ...capRings(rings[segsL], frames[segsL].T, 1)];
+  const fGroup = new THREE.Group();
+  fGroup.add(new THREE.Mesh(ringsToGeometry(all, radial, 0.30), isThumb ? SKIN_THUMB : SKIN_FINGER));
+  // 손톱: 손끝 등쪽에 묻힌 타원판
+  const iN = Math.round(0.93*segsL);
+  const fr = frames[iN], rg = rings[iN];
+  const nail = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), NAIL);
+  nail.scale.set(r*0.50, r*0.15, r*0.62);
+  nail.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(fr.S, fr.O, fr.T));
+  nail.position.copy(rg.P).addScaledVector(fr.O, rg.h*0.72);
+  fGroup.add(nail);
+  return fGroup;
+}
+/* 오른손(우투수) 기준 손가락 시작점.
+   투수 시점(-Z에서 +Z를 바라봄)에서 엄지가 왼쪽(-X), 검지→새끼가 왼쪽→오른쪽.
+   그립 데이터·투구 자세(오른팔 투구)·궤적 설명 모두 우투수 기준으로 통일. */
+/* 실제 인체 비율: 공 반지름 1(=3.7cm) 기준 손가락 지름 ≈ 0.45, 손바닥 폭 ≈ 2.2 (공보다 큼) */
+const KNUCKLES = {
+  index:  new THREE.Vector3( 0.62,-0.10,-1.12),
+  middle: new THREE.Vector3( 0.21,-0.02,-1.16),
+  ring:   new THREE.Vector3(-0.21,-0.06,-1.15),
+  pinky:  new THREE.Vector3(-0.62,-0.20,-1.10),
+  thumb:  new THREE.Vector3( 0.95,-0.55,-0.75)
+};
+const FINGER_R = { index:0.21, middle:0.22, ring:0.20, pinky:0.17, thumb:0.26 };
+const MARKER_COLORS = { index:'#ff5252', middle:'#40c4ff', ring:'#b2ff59', pinky:'#ce93d8', thumb:'#ffd740' };
+const FINGER_KO = { index:'검지', middle:'중지', ring:'약지', pinky:'새끼', thumb:'엄지' };
+
+let handGroup = null;        // 손 전체 (리그 또는 절차적)
+let fingerMeshes = {};       // 절차적 손: name -> {group, baseDir}
+let markerGroup = null;      // 접촉점 마커+라벨
+
+/* 절차적 손 (GLB 로드 실패 시 폴백) */
+function buildProceduralHand(pitch){
+  if(handGroup){ ballWorld.remove(handGroup); }
+  handGroup = new THREE.Group();
+  fingerMeshes = {};
+
+  // 오른 손바닥: 손목→너클로 넓어지는 실제 손 곡면 (손금 텍스처 포함)
+  {
+    const curve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3( 0.08,-1.30,-1.80),
+      new THREE.Vector3( 0.04,-0.74,-1.55),
+      new THREE.Vector3( 0.00,-0.24,-1.24)
+    );
+    const segsL = 24, radial = 22;
+    const rings = [], frames = [];
+    for(let i = 0; i <= segsL; i++){
+      const s = i/segsL;
+      const P = curve.getPoint(s);
+      const T = curve.getTangent(s).normalize();
+      const S = new THREE.Vector3().crossVectors(T, P.clone().normalize()).normalize();
+      const O = new THREE.Vector3().crossVectors(S, T).normalize();
+      const e = smoothstep01(s, 0, 1);
+      rings.push({P, S, O,
+        w: THREE.MathUtils.lerp(0.34, 1.02, e),   // 손목 → 너클로 넓어짐 (실제 손바닥 폭)
+        h: THREE.MathUtils.lerp(0.24, 0.19, s),
+        v: s});
+      frames.push({T, S, O});
+    }
+    const all = [...capRings(rings[0], frames[0].T, -1).reverse(), ...rings, ...capRings(rings[segsL], frames[segsL].T, 1)];
+    handGroup.add(new THREE.Mesh(ringsToGeometry(all, radial, 0.25), SKIN_PALM));
+    // 엄지 두덩(무지구) / 새끼 두덩(소지구)
+    const thenar = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 18), SKIN);
+    thenar.scale.set(0.42, 0.28, 0.48);
+    thenar.position.set(0.76,-0.70,-1.08);
+    thenar.rotation.x = 0.5;
+    handGroup.add(thenar);
+    const hypo = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 18), SKIN);
+    hypo.scale.set(0.30, 0.20, 0.42);
+    hypo.position.set(-0.48,-0.68,-1.38);
+    hypo.rotation.x = 0.55;
+    handGroup.add(hypo);
+    // 팔목
+    const wristDir = curve.getTangent(0).normalize();
+    const wrist = new THREE.Mesh(new THREE.CapsuleGeometry(0.29, 0.6, 6, 14), SKIN);
+    wrist.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), wristDir);
+    wrist.position.copy(curve.getPoint(0)).addScaledVector(wristDir, -0.30);
+    handGroup.add(wrist);
+    // 손가락 사이 물갈퀴 살
+    for(const [a,b] of [['index','middle'],['middle','ring'],['ring','pinky']]){
+      const web = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 12), SKIN);
+      web.scale.set(0.22, 0.12, 0.18);
+      web.position.copy(KNUCKLES[a]).add(KNUCKLES[b]).multiplyScalar(0.5)
+        .add(new THREE.Vector3(0, 0.07, 0.03));
+      handGroup.add(web);
+    }
+  }
+
+  for(const [name, def] of Object.entries(pitch.grip.fingers)){
+    const C = new THREE.Vector3(...def.pos).normalize();          // 접촉점 (반지름 1)
+    const K = KNUCKLES[name].clone();
+    const dir = C.clone();                                        // 공 중심→접촉점 방향
+    const fGroup = buildRealFinger(name, K, C);
+    handGroup.add(fGroup);
+    fingerMeshes[name] = { group:fGroup, baseDir:dir };
+  }
+  ballWorld.add(handGroup);
+}
+
+/* 접촉점 마커 + 라벨 (손 방식과 무관하게 공용) */
+function buildMarkers(pitch){
+  if(markerGroup){ ballWorld.remove(markerGroup); }
+  markerGroup = new THREE.Group();
+  for(const [name, def] of Object.entries(pitch.grip.fingers)){
+    if(!def.main) continue;
+    const C = new THREE.Vector3(...def.pos).normalize();
+    const mk = new THREE.Mesh(
+      new THREE.SphereGeometry(0.075, 14, 14),
+      new THREE.MeshBasicMaterial({color:MARKER_COLORS[name]})
+    );
+    mk.position.copy(C.clone().multiplyScalar(1.30));
+    markerGroup.add(mk);
+    const lb = makeLabel(FINGER_KO[name]+' 접촉', MARKER_COLORS[name]);
+    lb.position.copy(C.clone().multiplyScalar(1.56));
+    markerGroup.add(lb);
+  }
+  ballWorld.add(markerGroup);
+}
+
+/* ═══════════════ 리깅된 리얼 핸드 (WebXR generic-hand, Apache-2.0) ═══════════════
+   스킨드 메시 + 25개 관절 뼈대. 구종의 접촉점 데이터에서 공 표면을 감는
+   측지선을 따라 뼈 길이만큼 행진하여 관절 목표를 만들고, 각 뼈를 조준(aim)한다.
+   → 구종 데이터(접촉점)만으로 실제 손이 자동으로 그립을 쥔다. */
+const HAND_GLB_URL = 'https://cdn.jsdelivr.net/npm/@webxr-input-profiles/assets@1.0/dist/profiles/generic-hand/right.glb';
+const HAND_CHAINS = {
+  thumb:  ['thumb-metacarpal','thumb-phalanx-proximal','thumb-phalanx-distal','thumb-tip'],
+  index:  ['index-finger-phalanx-proximal','index-finger-phalanx-intermediate','index-finger-phalanx-distal','index-finger-tip'],
+  middle: ['middle-finger-phalanx-proximal','middle-finger-phalanx-intermediate','middle-finger-phalanx-distal','middle-finger-tip'],
+  ring:   ['ring-finger-phalanx-proximal','ring-finger-phalanx-intermediate','ring-finger-phalanx-distal','ring-finger-tip'],
+  pinky:  ['pinky-finger-phalanx-proximal','pinky-finger-phalanx-intermediate','pinky-finger-phalanx-distal','pinky-finger-tip']
+};
+const HAND_PAD = { thumb:0.20, index:0.17, middle:0.18, ring:0.16, pinky:0.14 };  // 손가락 반두께(공 반지름 단위)
+
+class HandRig {
+  constructor(){
+    this.ready = false;
+    this.root = null;
+    this.joints = {};
+    this.bindQ = {};
+    this.gripQ = {};
+    this._v1 = new THREE.Vector3(); this._v2 = new THREE.Vector3();
+    this._v3 = new THREE.Vector3(); this._q1 = new THREE.Quaternion();
+  }
+  load(onDone){
+    new GLTFLoader().load(HAND_GLB_URL, (gltf)=>{
+      try{ this._setup(gltf); this.ready = true; }catch(e){ console.warn('HandRig setup 실패', e); }
+      onDone();
+    }, undefined, (err)=>{ console.warn('HandRig 로드 실패 — 절차적 손 사용', err); onDone(); });
+  }
+  _setup(gltf){
+    // root(외부 인터페이스, 항상 identity) > placer(배치 변환 보관) > 모델
+    this.root = new THREE.Group();
+    this.placer = new THREE.Group();
+    this.root.add(this.placer);
+    this.placer.add(gltf.scene);
+    gltf.scene.traverse(o=>{
+      o.matrixAutoUpdate = true;   // WebXR용 GLB는 관절 행렬 자동갱신이 꺼진 채 로드됨
+      if(o.isBone) this.joints[o.name] = o;
+      if(o.isSkinnedMesh){
+        o.frustumCulled = false;
+        o.material = new THREE.MeshStandardMaterial({color:0xe0a984, roughness:0.52});
+      }
+    });
+    // WebXR GLB는 관절이 평면 계층(모든 관절이 형제) → FK가 되도록 해부학적 체인으로 재부모화.
+    // attach()는 월드 변환을 보존하며 부모를 바꾼다.
+    this.root.updateMatrixWorld(true);
+    const ANATOMY = [
+      ['wrist','thumb-metacarpal','thumb-phalanx-proximal','thumb-phalanx-distal','thumb-tip'],
+      ['wrist','index-finger-metacarpal','index-finger-phalanx-proximal','index-finger-phalanx-intermediate','index-finger-phalanx-distal','index-finger-tip'],
+      ['wrist','middle-finger-metacarpal','middle-finger-phalanx-proximal','middle-finger-phalanx-intermediate','middle-finger-phalanx-distal','middle-finger-tip'],
+      ['wrist','ring-finger-metacarpal','ring-finger-phalanx-proximal','ring-finger-phalanx-intermediate','ring-finger-phalanx-distal','ring-finger-tip'],
+      ['wrist','pinky-finger-metacarpal','pinky-finger-phalanx-proximal','pinky-finger-phalanx-intermediate','pinky-finger-phalanx-distal','pinky-finger-tip']
+    ];
+    for(const chain of ANATOMY){
+      for(let i = 1; i < chain.length; i++){
+        const parent = this.joints[chain[i-1]], child = this.joints[chain[i]];
+        if(parent && child && child.parent !== parent) parent.attach(child);
+      }
+    }
+    this.root.updateMatrixWorld(true);
+    for(const [n,b] of Object.entries(this.joints)) this.bindQ[n] = b.quaternion.clone();
+    // 손 배치: bind(손가락 -Y, 손바닥 -X, 엄지 -Z) → 월드(손가락 +Y, 손바닥 +Z(공쪽), 엄지 +X)
+    // 오른손 검증: 엄지 = 손가락 × 손바닥 = (0,1,0)×(0,0,1) = (1,0,0) = +X ✓ (투수 시점 왼쪽)
+    this.placer.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(0,0,-1), new THREE.Vector3(0,-1,0), new THREE.Vector3(-1,0,0)));
+    // 손바닥이 공 쪽으로 살짝 기울도록
+    this.placer.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), 0.25));
+    this.placer.scale.setScalar(27.3);   // 1m = 27.3 공반지름 (공 반지름 3.66cm) → 실물 크기 비율
+    // 중지 너클(MCP)이 공 뒤 기준점에 오도록 평행이동
+    this.root.updateMatrixWorld(true);
+    const mp = this.joints['middle-finger-phalanx-proximal'].getWorldPosition(this._v1);
+    this.placer.position.add(new THREE.Vector3(0.0,-0.02,-1.30).sub(mp));
+    this.root.updateMatrixWorld(true);
+  }
+  /* 측지선 행진: P0에서 접촉 방향 uC로, 각 뼈 길이만큼 목표점 생성 */
+  _wrapTargets(P0, uC, lengths, pad){
+    const targets = [];
+    const u0 = P0.clone().normalize();
+    const r0 = P0.length();
+    const hugR = 1 + pad;
+    let prev = P0.clone(), t = 0;
+    const tmp = new THREE.Vector3();
+    for(let li = 0; li < lengths.length; li++){
+      const L = lengths[li];
+      const isLast = (li === lengths.length-1);
+      let guard = 0;
+      while(guard++ < 400){
+        t += 0.008;
+        slerpVec(u0, uC, t, tmp);
+        const R = isLast && t >= 1
+          ? 1 + pad*0.72                                     // 손끝 패드는 공에 눌림
+          : THREE.MathUtils.lerp(r0, hugR, smoothstep01(Math.min(t,1), 0, 0.5));
+        tmp.multiplyScalar(R);
+        if(tmp.distanceTo(prev) >= L) break;
+      }
+      targets.push(tmp.clone());
+      prev.copy(tmp);
+    }
+    return targets;
+  }
+  /* 뼈 체인을 목표점들로 순서대로 조준 */
+  _aimChain(chain, uC, pad){
+    const joints = chain.map(n=>this.joints[n]);
+    this.root.updateMatrixWorld(true);
+    const P0 = joints[0].getWorldPosition(new THREE.Vector3());
+    const lengths = [];
+    for(let i = 0; i < 3; i++){
+      lengths.push(joints[i].getWorldPosition(this._v1).distanceTo(joints[i+1].getWorldPosition(this._v2)));
+    }
+    const targets = this._wrapTargets(P0, uC, lengths, pad);
+    for(let i = 0; i < 3; i++){
+      const bone = joints[i], child = joints[i+1];
+      this.root.updateMatrixWorld(true);
+      const bw = bone.getWorldPosition(this._v1);
+      const vCur = child.getWorldPosition(this._v2).sub(bw).normalize();
+      const vDes = this._v3.copy(targets[i]).sub(bw).normalize();
+      const pqInv = bone.parent.getWorldQuaternion(this._q1).invert();
+      const a = vCur.applyQuaternion(pqInv).normalize();
+      const b = vDes.applyQuaternion(pqInv).normalize();
+      const dq = new THREE.Quaternion().setFromUnitVectors(a, b);
+      if(this.debugLog) this.debugLog.push(
+        chain[i]+' dqDeg='+(2*Math.acos(Math.min(1,Math.abs(dq.w)))*57.3).toFixed(1)+
+        ' tgt=('+targets[i].toArray().map(n=>n.toFixed(2))+')');
+      bone.quaternion.premultiply(dq);
+    }
+  }
+  /* 구종 접촉점 데이터로 그립 포즈 + "깊이 누른" 프레스 포즈 생성 */
+  pose(pitch){
+    try{
+      const aimAll = (padScale)=>{
+        for(const [n,q] of Object.entries(this.bindQ)) this.joints[n].quaternion.copy(q);
+        this.root.updateMatrixWorld(true);
+        for(const [name, def] of Object.entries(pitch.grip.fingers)){
+          if(!HAND_CHAINS[name]) continue;
+          const uC = new THREE.Vector3(...def.pos).normalize();
+          this._aimChain(HAND_CHAINS[name], uC, HAND_PAD[name]*padScale);
+        }
+      };
+      aimAll(1.0);                       // 기본 그립
+      this.gripQ = {};
+      for(const [n,b] of Object.entries(this.joints)) this.gripQ[n] = b.quaternion.clone();
+      aimAll(0.55);                      // 릴리스 직전 "파고들며 누르는" 포즈
+      this.pressQ = {};
+      for(const [n,b] of Object.entries(this.joints)) this.pressQ[n] = b.quaternion.clone();
+      for(const [n,b] of Object.entries(this.joints)) b.quaternion.copy(this.gripQ[n]);
+      this.lastError = null;
+    }catch(e){
+      this.lastError = String(e && e.stack || e);
+      console.warn('HandRig.pose 실패', e);
+    }
+  }
+  /* 릴리스 진행도 t(0~1)에서 구종별 손가락 역할대로 뼈를 움직인다.
+     p<0: 그립→프레스(더 누름), p>0: 그립→펴짐 */
+  setRelease(t, pitch){
+    const acts = (pitch && pitch.release && pitch.release.fingers) || null;
+    for(const [name, chain] of Object.entries(HAND_CHAINS)){
+      const act = acts ? acts[name] : null;
+      const role = act ? act.role
+        : (name === 'thumb' ? 'release' : 'press');
+      const timing = act ? act.timing
+        : (pitch ? (name === 'thumb' ? pitch.release.thumbTiming : pitch.release.fingerTiming) : 1);
+      const p = releaseFingerCurve(role, t, timing);
+      for(const bn of chain){
+        const g = this.gripQ[bn];
+        if(!g) continue;
+        const b = this.joints[bn];
+        if(p >= 0) b.quaternion.slerpQuaternions(g, this.bindQ[bn], Math.min(p,1)*0.72);
+        else       b.quaternion.slerpQuaternions(g, (this.pressQ && this.pressQ[bn]) || g, Math.min(-p,1));
+      }
+    }
+  }
+}
+/* 손가락 역할별 릴리스 곡선. 반환 p: -1(깊이 누름) ~ 0(그립) ~ 1(펴짐) */
+function releaseFingerCurve(role, t, timing){
+  switch(role){
+    case 'snap': {          // 긁으며 튕기기: 직전에 파고들었다가 빠르게 튕겨 펴짐
+      const dig  = smoothstep01(t, timing-0.10, timing-0.02);
+      const open = smoothstep01(t, timing, timing+0.05);
+      return -0.95*dig*(1-open) + open;
+    }
+    case 'press': {         // 끝까지 눌러주기: 깊게 누른 채 버티다가 늦게 펴짐
+      const dig  = smoothstep01(t, timing-0.14, timing-0.03);
+      const open = smoothstep01(t, timing+0.01, timing+0.09);
+      return -0.6*dig*(1-open) + open;
+    }
+    case 'hold': {          // 꽉 잡고 지지: 일찍 떨어지되 절반만 펴진 채 유지
+      return 0.55 * smoothstep01(t, timing, timing+0.18);
+    }
+    case 'loose': {         // 힘 빼고 걸치기: 처음부터 살짝 열려 있고 부드럽게 펴짐
+      return 0.25 + 0.55 * smoothstep01(t, timing, timing+0.25);
+    }
+    default: {              // release: 먼저 놓아주기
+      return smoothstep01(t, timing, timing+0.12);
+    }
+  }
+}
+const ROLE_KO = {
+  snap:'긁으며 튕기기', press:'끝까지 눌러주기', hold:'꽉 잡고 지지',
+  release:'먼저 놓아주기', loose:'힘 빼고 걸치기'
+};
+const handRig = new HandRig();
+
+/* ── 릴리스 손가락 모션 시각화: 손끝 궤적 + 동작 화살표 + 클릭 포커스 ── */
+const trailGroup = new THREE.Group(); scene.add(trailGroup);
+const fingerTrails = {}, fingerArrows = {};
+for(const name of Object.keys(HAND_CHAINS)){
+  const line = new THREE.Line(
+    new THREE.BufferGeometry(),
+    new THREE.LineBasicMaterial({color:MARKER_COLORS[name], transparent:true, opacity:0.85})
+  );
+  line.frustumCulled = false;
+  trailGroup.add(line);
+  fingerTrails[name] = {line, pts:[]};
+  const ar = new THREE.ArrowHelper(new THREE.Vector3(0,1,0), new THREE.Vector3(), 0.55,
+    new THREE.Color(MARKER_COLORS[name]).getHex(), 0.16, 0.09);
+  ar.visible = false;
+  trailGroup.add(ar);
+  fingerArrows[name] = ar;
+}
+const focusTip = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12),
+  new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0.85}));
+focusTip.visible = false; trailGroup.add(focusTip);
+let focusLabel = null;
+function clearTrails(){
+  for(const tr of Object.values(fingerTrails)){ tr.pts.length = 0; tr.line.geometry.setFromPoints([]); }
+  for(const a of Object.values(fingerArrows)) a.visible = false;
+}
+function clearFocusVisuals(){
+  state.focusFinger = null;
+  focusTip.visible = false;
+  if(focusLabel){ trailGroup.remove(focusLabel); focusLabel = null; }
+}
+
+/* 손 적용: 리그가 준비되면 리그, 아니면 절차적 손 */
+function applyHand(pitch){
+  if(handRig.ready){
+    if(handGroup && handGroup !== handRig.root){ ballWorld.remove(handGroup); }
+    fingerMeshes = {};
+    handRig.pose(pitch);
+    handRig.setRelease(0, pitch);
+    if(handRig.root.parent !== ballWorld) ballWorld.add(handRig.root);
+    handGroup = handRig.root;
+  } else {
+    buildProceduralHand(pitch);
+  }
+}
+
+/* 회전축 표시 (SPIN 모드) */
+const spinHelper = new THREE.Group(); ballWorld.add(spinHelper);
+function buildSpinHelper(pitch){
+  spinHelper.clear();
+  const axis = new THREE.Vector3(...pitch.spin.axis).normalize();
+  const arrow = new THREE.ArrowHelper(axis, axis.clone().multiplyScalar(-1.9), 3.8, 0xffb300, 0.45, 0.25);
+  spinHelper.add(arrow);
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1.45, 0.02, 8, 80),
+    new THREE.MeshBasicMaterial({color:0x4fc3f7, transparent:true, opacity:0.75})
+  );
+  ring.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1), axis);
+  spinHelper.add(ring);
+  const lb = makeLabel('회전축 Spin Axis', '#ffb300');
+  lb.position.copy(axis.clone().multiplyScalar(2.35));
+  spinHelper.add(lb);
+}
+
+/* ═══════════════ 필드 월드 (MOTION / PATH) ═══════════════ */
+const fieldWorld = new THREE.Group(); scene.add(fieldWorld);
+{
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(14, 26),
+    new THREE.MeshStandardMaterial({color:0x1e4d2b, roughness:1})
+  );
+  ground.rotation.x = -Math.PI/2; ground.position.set(0, 0, 9); fieldWorld.add(ground);
+  const mound = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.4, 1.7, 0.22, 32),
+    new THREE.MeshStandardMaterial({color:0x8d6e4a, roughness:1})
+  );
+  mound.position.set(0, 0.06, 0.3); fieldWorld.add(mound);
+  const rubber = new THREE.Mesh(new THREE.BoxGeometry(0.6,0.05,0.15),
+    new THREE.MeshStandardMaterial({color:0xeeeeee}));
+  rubber.position.set(0, 0.2, 0.3); fieldWorld.add(rubber);
+  const dirtHome = new THREE.Mesh(new THREE.CylinderGeometry(1.6,1.6,0.02,32),
+    new THREE.MeshStandardMaterial({color:0x8d6e4a, roughness:1}));
+  dirtHome.position.set(0, 0.012, 18.0); fieldWorld.add(dirtHome);
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.43,0.03,0.43),
+    new THREE.MeshStandardMaterial({color:0xf5f5f5}));
+  plate.position.set(0, 0.03, 18.0); fieldWorld.add(plate);
+  // 스트라이크 존
+  const zone = new THREE.LineSegments(
+    new THREE.EdgesGeometry(new THREE.PlaneGeometry(0.45, 0.65)),
+    new THREE.LineBasicMaterial({color:0xffb300})
+  );
+  zone.position.set(0, 0.85, 17.6); fieldWorld.add(zone);
+  const zoneLb = makeLabel('스트라이크 존', '#ffb300');
+  zoneLb.position.set(0, 1.45, 17.6); zoneLb.scale.multiplyScalar(1.6); fieldWorld.add(zoneLb);
+}
+
+/* 궤적 라인 + 궤적용 공 */
+let trajLine = null;
+let trajCurve = null;
+const trajBall = createBaseball(0.13); fieldWorld.add(trajBall);
+const FAMILY_COLORS = { FASTBALL:0xef5350, BREAKING:0xab47bc, OFFSPEED:0x26a69a, SPECIAL:0x78909c };
+function buildTrajectory(pitch){
+  if(trajLine){ fieldWorld.remove(trajLine); trajLine.geometry.dispose(); }
+  const tr = pitch.trajectory;
+  trajCurve = new THREE.CubicBezierCurve3(
+    new THREE.Vector3(...tr.start), new THREE.Vector3(...tr.c1),
+    new THREE.Vector3(...tr.c2), new THREE.Vector3(...tr.end)
+  );
+  trajLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(trajCurve.getPoints(120)),
+    new THREE.LineBasicMaterial({color:FAMILY_COLORS[pitch.family], transparent:true, opacity:0.85})
+  );
+  fieldWorld.add(trajLine);
+}
+
+/* ═══════════════ 투구 자세 스켈레톤 ═══════════════ */
+const JOINTS = ['head','neck','rSho','lSho','rElb','lElb','rWri','lWri','hip','rKnee','lKnee','rAnk','lAnk'];
+const BONES = [
+  ['neck','head'],['neck','rSho'],['neck','lSho'],
+  ['rSho','rElb'],['rElb','rWri'],['lSho','lElb'],['lElb','lWri'],
+  ['neck','hip'],['hip','rKnee'],['rKnee','rAnk'],['hip','lKnee'],['lKnee','lAnk']
+];
+// 투구 6단계 키프레임 (P0 SET → P5 FOLLOW THROUGH)
+const POSE_TIMES = [0, 0.18, 0.42, 0.62, 0.78, 1.0];
+const POSE_NAMES = ['SET 준비','LEG LIFT 다리 들기','STRIDE 내딛기','ARM COCKING 팔 준비','RELEASE 릴리스','FOLLOW THROUGH 마무리'];
+/* 우투수 기준: 투수는 +Z(홈플레이트)를 바라보고, 오른팔은 -X 쪽. */
+const POSES = [
+  { head:[0,1.78,0], neck:[0,1.58,0], rSho:[-0.24,1.5,0], lSho:[0.24,1.5,0],
+    rElb:[-0.3,1.22,0.06], lElb:[0.3,1.22,0.06], rWri:[-0.12,1.18,0.28], lWri:[0.12,1.18,0.28],
+    hip:[0,1.0,0], rKnee:[-0.14,0.55,0.02], lKnee:[0.14,0.55,0.02], rAnk:[-0.14,0.06,0], lAnk:[0.14,0.06,0] },
+  { head:[0,1.74,0], neck:[0,1.54,0], rSho:[-0.24,1.46,0], lSho:[0.24,1.46,0],
+    rElb:[-0.3,1.2,0.08], lElb:[0.3,1.2,0.08], rWri:[-0.1,1.16,0.3], lWri:[0.1,1.16,0.3],
+    hip:[0,0.98,-0.02], rKnee:[-0.14,0.52,0], lKnee:[0.16,1.02,0.18], rAnk:[-0.14,0.06,0], lAnk:[0.16,0.62,0.12] },
+  { head:[0,1.66,0.12], neck:[0,1.47,0.1], rSho:[-0.26,1.4,0.02], lSho:[0.26,1.42,0.18],
+    rElb:[-0.5,1.48,-0.22], lElb:[0.42,1.35,0.5], rWri:[-0.6,1.28,-0.52], lWri:[0.48,1.3,0.78],
+    hip:[0,0.92,0.22], rKnee:[-0.16,0.5,0.1], lKnee:[0.16,0.58,0.6], rAnk:[-0.14,0.06,-0.08], lAnk:[0.18,0.07,0.95] },
+  { head:[0,1.68,0.3], neck:[0,1.5,0.28], rSho:[-0.26,1.46,0.2], lSho:[0.26,1.44,0.42],
+    rElb:[-0.5,1.62,-0.05], lElb:[0.36,1.2,0.55], rWri:[-0.52,1.92,-0.3], lWri:[0.3,1.05,0.6],
+    hip:[0,0.94,0.4], rKnee:[-0.16,0.5,0.2], lKnee:[0.16,0.6,0.8], rAnk:[-0.14,0.1,-0.15], lAnk:[0.18,0.07,1.0] },
+  { head:[0,1.6,0.55], neck:[0,1.44,0.52], rSho:[-0.22,1.5,0.6], lSho:[0.26,1.35,0.6],
+    rElb:[-0.34,1.72,0.78], lElb:[0.3,1.05,0.5], rWri:[-0.3,1.85,1.05], lWri:[0.24,1.0,0.45],
+    hip:[0,0.95,0.55], rKnee:[-0.16,0.55,0.3], lKnee:[0.16,0.6,0.9], rAnk:[-0.15,0.2,-0.25], lAnk:[0.18,0.07,1.0] },
+  { head:[0,1.35,0.85], neck:[0,1.22,0.8], rSho:[-0.2,1.28,0.85], lSho:[0.26,1.2,0.75],
+    rElb:[0.0,1.0,1.0], lElb:[0.32,1.0,0.55], rWri:[0.18,0.8,1.15], lWri:[0.3,0.95,0.5],
+    hip:[0,0.95,0.65], rKnee:[-0.18,0.62,0.5], lKnee:[0.16,0.6,0.95], rAnk:[-0.2,0.55,0.05], lAnk:[0.18,0.07,1.0] }
+];
+
+/* 볼륨형 사람 투수: 유니폼·바지·모자·글러브·스파이크를 갖춘 우투수 */
+const skeleton = new THREE.Group(); fieldWorld.add(skeleton);
+const M_SKIN2  = new THREE.MeshStandardMaterial({color:0xe0a984, roughness:0.6});
+const M_JERSEY = new THREE.MeshStandardMaterial({color:0xeef0f4, roughness:0.75});
+const M_PANTS  = new THREE.MeshStandardMaterial({color:0xdfe3ea, roughness:0.8});
+const M_NAVY   = new THREE.MeshStandardMaterial({color:0x1f3a6e, roughness:0.6});
+const M_GLOVE  = new THREE.MeshStandardMaterial({color:0x8d5a2b, roughness:0.7});
+const M_SHOE   = new THREE.MeshStandardMaterial({color:0x22262e, roughness:0.5});
+const BONE_DEFS = [
+  ['neck','head', 0.045, M_SKIN2],
+  ['neck','rSho', 0.065, M_JERSEY], ['neck','lSho', 0.065, M_JERSEY],
+  ['rSho','rElb', 0.055, M_JERSEY], ['rElb','rWri', 0.047, M_SKIN2],
+  ['lSho','lElb', 0.055, M_JERSEY], ['lElb','lWri', 0.047, M_SKIN2],
+  ['neck','hip',  0.115, M_JERSEY],
+  ['hip','rKnee', 0.078, M_PANTS], ['rKnee','rAnk', 0.060, M_PANTS],
+  ['hip','lKnee', 0.078, M_PANTS], ['lKnee','lAnk', 0.060, M_PANTS]
+];
+const JOINT_STYLE = {
+  head:[0.125,M_SKIN2], neck:[0.050,M_JERSEY], rSho:[0.078,M_JERSEY], lSho:[0.078,M_JERSEY],
+  rElb:[0.058,M_JERSEY], lElb:[0.058,M_JERSEY], rWri:[0.050,M_SKIN2], lWri:[0.050,M_SKIN2],
+  hip:[0.120,M_PANTS], rKnee:[0.072,M_PANTS], lKnee:[0.072,M_PANTS], rAnk:[0.055,M_SHOE], lAnk:[0.055,M_SHOE]
+};
+const jointMeshes = {}, boneMeshes = [];
+const body = {};
+{
+  for(const j of JOINTS){
+    const [r, mat] = JOINT_STYLE[j];
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 16), mat);
+    skeleton.add(m); jointMeshes[j] = m;
+  }
+  for(const def of BONE_DEFS){
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1, 12), def[3]);
+    skeleton.add(m); boneMeshes.push(m);
+  }
+  body.chest  = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 18), M_JERSEY);
+  body.chest.scale.set(0.21, 0.19, 0.145);
+  body.pelvis = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 18), M_PANTS);
+  body.pelvis.scale.set(0.17, 0.13, 0.125);
+  body.cap    = new THREE.Mesh(new THREE.SphereGeometry(0.128, 16, 16, 0, Math.PI*2, 0, Math.PI/2), M_NAVY);
+  body.brim   = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.015, 0.13), M_NAVY);
+  body.glove  = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 14), M_GLOVE);
+  body.glove.scale.set(0.115, 0.15, 0.085);
+  body.shoeR  = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.075, 0.24), M_SHOE);
+  body.shoeL  = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.075, 0.24), M_SHOE);
+  for(const m of Object.values(body)) skeleton.add(m);
+}
+const motionBall = createBaseball(0.11); fieldWorld.add(motionBall);
+
+/* ═══ 리얼 인체 투수: three.js Xbot(믹사모 리그, MIT) + 키프레임 리타겟팅 ═══
+   투구 6단계 키프레임(관절 위치)을 향해 각 뼈를 조준(aim)해 스킨드 인체가
+   실제 투구 동작을 수행한다. 로드 실패 시 볼륨 피규어로 폴백. */
+const XBOT_URL = 'https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/models/gltf/Xbot.glb';
+class PitcherRig {
+  constructor(){
+    this.ready = false; this.root = null; this.bones = {}; this.bindQ = {};
+    this._v1 = new THREE.Vector3(); this._v2 = new THREE.Vector3();
+    this._v3 = new THREE.Vector3(); this._q1 = new THREE.Quaternion();
+    this._t = new THREE.Vector3();
+  }
+  load(onDone){
+    new GLTFLoader().load(XBOT_URL, (g)=>{
+      try{ this._setup(g); this.ready = true; }catch(e){ console.warn('PitcherRig setup 실패', e); }
+      onDone();
+    }, undefined, (err)=>{ console.warn('PitcherRig 로드 실패 — 볼륨 피규어 사용', err); onDone(); });
+  }
+  _setup(gltf){
+    this.root = new THREE.Group();
+    this.root.add(gltf.scene);
+    // 프로야구 선수 유니폼: 정점의 주도 뼈(skinIndex)로 부위 판정 → 버텍스 컬러
+    // 피부(얼굴·손) / 흰 저지 / 네이비 언더셔츠 소매 / 흰 바지 / 검은 스파이크
+    const regionColor = (boneName)=>{
+      if(/Head|Neck/.test(boneName))      return [0.85, 0.60, 0.45];   // 피부
+      if(/Hand/.test(boneName))           return [0.85, 0.60, 0.45];   // 손
+      if(/ForeArm/.test(boneName))        return [0.07, 0.10, 0.22];   // 언더셔츠 소매
+      if(/Foot|Toe/.test(boneName))       return [0.06, 0.07, 0.09];   // 스파이크
+      if(/UpLeg|Leg/.test(boneName))      return [0.85, 0.87, 0.92];   // 바지
+      return [0.90, 0.91, 0.95];                                       // 저지(몸통·어깨·상완)
+    };
+    gltf.scene.traverse(o=>{
+      o.matrixAutoUpdate = true;
+      if(o.isBone) this.bones[o.name] = o;
+      if(o.isSkinnedMesh){
+        o.frustumCulled = false;
+        const g = o.geometry;
+        const si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+        const n = g.attributes.position.count;
+        const colors = new Float32Array(n*3);
+        for(let i = 0; i < n; i++){
+          let best = 0, bw = -1;
+          for(let k = 0; k < 4; k++){
+            const w = sw.getComponent(i, k);
+            if(w > bw){ bw = w; best = si.getComponent(i, k); }
+          }
+          colors.set(regionColor(o.skeleton.bones[best].name), i*3);
+        }
+        g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        o.material = new THREE.MeshStandardMaterial({vertexColors:true, roughness:0.68});
+      }
+    });
+    for(const [n,b] of Object.entries(this.bones)) this.bindQ[n] = b.quaternion.clone();
+    // 장비 부착: 모자(머리 뼈) · 글러브(왼손 뼈) · 벨트(골반 뼈) — 뼈를 따라 움직임.
+    // 믹사모 뼈에는 cm→m 스케일이 배어 있어 월드 스케일을 측정해 보정한다.
+    this.root.updateMatrixWorld(true);
+    const attachTo = (bone, obj, wx, wy, wz)=>{
+      if(!bone) return;
+      const s = bone.getWorldScale(new THREE.Vector3()).x || 1;
+      obj.scale.multiplyScalar(1/s);
+      obj.position.set(wx/s, wy/s, wz/s);
+      bone.add(obj);
+    };
+    const NAVY = new THREE.MeshStandardMaterial({color:0x14264d, roughness:0.6});
+    const GLOVE_M = new THREE.MeshStandardMaterial({color:0x7a4a22, roughness:0.7});
+    {
+      const cap = new THREE.Group();
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(0.115, 18, 14, 0, Math.PI*2, 0, Math.PI/2), NAVY);
+      dome.scale.set(1, 0.85, 1.05);
+      const brim = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.013, 0.115), NAVY);
+      brim.position.set(0, 0.005, 0.13);
+      cap.add(dome, brim);
+      attachTo(this.bones['mixamorigHead'], cap, 0, 0.145, 0.02);
+    }
+    {
+      // 글러브: 손 전체를 감싸는 미트 (포켓 + 손목 커프)
+      const glove = new THREE.Group();
+      const pocket = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 16), GLOVE_M);
+      pocket.scale.set(0.125, 0.165, 0.135);
+      glove.add(pocket);
+      const cuff = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 12), GLOVE_M);
+      cuff.scale.set(0.095, 0.085, 0.105);
+      cuff.position.set(0, -0.10, 0);
+      glove.add(cuff);
+      attachTo(this.bones['mixamorigLeftHand'], glove, 0, 0.075, 0);
+    }
+    {
+      const belt = new THREE.Mesh(new THREE.TorusGeometry(0.135, 0.022, 10, 24), NAVY);
+      belt.rotation.x = Math.PI/2;
+      belt.scale.set(1, 0.75, 1);
+      attachTo(this.bones['mixamorigHips'], belt, 0, -0.015, 0);
+    }
+    this.root.visible = false;
+    fieldWorld.add(this.root);
+  }
+  _aim(bone, child, t3){
+    if(!bone || !child) return;
+    this.root.updateMatrixWorld(true);
+    const bw = bone.getWorldPosition(this._v1);
+    const vCur = child.getWorldPosition(this._v2).sub(bw).normalize();
+    const vDes = this._v3.set(t3[0], t3[1], t3[2]).sub(bw).normalize();
+    const pqInv = bone.parent.getWorldQuaternion(this._q1).invert();
+    const a = vCur.applyQuaternion(pqInv).normalize();
+    const b = vDes.applyQuaternion(pqInv).normalize();
+    bone.quaternion.premultiply(new THREE.Quaternion().setFromUnitVectors(a, b));
+  }
+  retarget(pose){
+    const B = this.bones;
+    for(const [n,q] of Object.entries(this.bindQ)) B[n].quaternion.copy(q);
+    // 힙 위치
+    this.root.updateMatrixWorld(true);
+    const hips = B['mixamorigHips'];
+    const cur = hips.getWorldPosition(this._v1);
+    this.root.position.x += pose.hip[0] - cur.x;
+    this.root.position.y += pose.hip[1] - cur.y;
+    this.root.position.z += pose.hip[2] - cur.z;
+    // 골반: 척추를 목 방향으로 세우고, 무릎 좌우 방향으로 비틀기
+    this._aim(hips, B['mixamorigSpine'], pose.neck);
+    this.root.updateMatrixWorld(true);
+    const hw = hips.getWorldPosition(this._v1);
+    const spineDir = this._t.set(...pose.neck).sub(hw).normalize();
+    const rHead = B['mixamorigRightUpLeg'].getWorldPosition(this._v2).sub(hw);
+    rHead.addScaledVector(spineDir, -rHead.dot(spineDir)).normalize();
+    const rDes = this._v3.set(
+      pose.rKnee[0]-pose.lKnee[0], pose.rKnee[1]-pose.lKnee[1], pose.rKnee[2]-pose.lKnee[2]);
+    rDes.addScaledVector(spineDir, -rDes.dot(spineDir)).normalize();
+    const twistAng = Math.atan2(
+      new THREE.Vector3().crossVectors(rHead, rDes).dot(spineDir), rHead.dot(rDes));
+    const pqInv = hips.parent.getWorldQuaternion(this._q1).invert();
+    const axisLocal = spineDir.clone().applyQuaternion(pqInv).normalize();
+    hips.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(axisLocal, twistAng * 0.8));
+    // 상체·팔·다리 체인 조준
+    const A = (bn, cn, t)=>this._aim(B[bn], B[cn], t);
+    A('mixamorigSpine2','mixamorigNeck', pose.neck);
+    A('mixamorigNeck','mixamorigHead', pose.head);
+    A('mixamorigRightShoulder','mixamorigRightArm', pose.rSho);
+    A('mixamorigRightArm','mixamorigRightForeArm', pose.rElb);
+    A('mixamorigRightForeArm','mixamorigRightHand', pose.rWri);
+    A('mixamorigRightHand','mixamorigRightHandMiddle1',
+      [pose.rWri[0]+(pose.rWri[0]-pose.rElb[0])*0.4,
+       pose.rWri[1]+(pose.rWri[1]-pose.rElb[1])*0.4,
+       pose.rWri[2]+(pose.rWri[2]-pose.rElb[2])*0.4]);
+    A('mixamorigLeftShoulder','mixamorigLeftArm', pose.lSho);
+    A('mixamorigLeftArm','mixamorigLeftForeArm', pose.lElb);
+    A('mixamorigLeftForeArm','mixamorigLeftHand', pose.lWri);
+    A('mixamorigRightUpLeg','mixamorigRightLeg', pose.rKnee);
+    A('mixamorigRightLeg','mixamorigRightFoot', pose.rAnk);
+    A('mixamorigRightFoot','mixamorigRightToeBase',
+      [pose.rAnk[0], pose.rAnk[1]-0.04, pose.rAnk[2]+0.16]);
+    A('mixamorigLeftUpLeg','mixamorigLeftLeg', pose.lKnee);
+    A('mixamorigLeftLeg','mixamorigLeftFoot', pose.lAnk);
+    A('mixamorigLeftFoot','mixamorigLeftToeBase',
+      [pose.lAnk[0], pose.lAnk[1]-0.04, pose.lAnk[2]+0.16]);
+  }
+}
+const pitcherRig = new PitcherRig();
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _up = new THREE.Vector3(0,1,0);
+
+function samplePose(t, pitch){
+  // t(0..1)에 해당하는 보간 포즈 반환
+  let i = 0;
+  while(i < POSE_TIMES.length-2 && t > POSE_TIMES[i+1]) i++;
+  const t0 = POSE_TIMES[i], t1 = POSE_TIMES[i+1];
+  let f = (t - t0) / (t1 - t0);
+  f = f<0?0:(f>1?1:f);
+  f = f*f*(3-2*f);  // smoothstep
+  const out = {};
+  for(const j of JOINTS){
+    const a = POSES[i][j], b = POSES[i+1][j];
+    out[j] = [ a[0]+(b[0]-a[0])*f, a[1]+(b[1]-a[1])*f, a[2]+(b[2]-a[2])*f ];
+  }
+  // 구종별 릴리스 높이 반영 (릴리스 구간에서 오른 손목 높이 조정)
+  const rh = (pitch.motion && pitch.motion.releaseHeight) || 1.0;
+  if(rh !== 1.0 && t > 0.55 && t < 0.9) out.rWri[1] *= rh;
+  return out;
+}
+function applyPose(pose){
+  for(const j of JOINTS) jointMeshes[j].position.set(...pose[j]);
+  for(let i=0;i<BONE_DEFS.length;i++){
+    const [a,b,r] = BONE_DEFS[i];
+    _v1.set(...pose[a]); _v2.set(...pose[b]);
+    const m = boneMeshes[i];
+    m.position.copy(_v1).add(_v2).multiplyScalar(0.5);
+    const d = _v2.clone().sub(_v1);
+    m.scale.set(r, d.length(), r);
+    m.quaternion.setFromUnitVectors(_up, d.normalize());
+  }
+  // 몸통·모자·글러브·스파이크 배치
+  _v1.set(...pose.neck); _v2.set(...pose.hip);
+  body.chest.position.lerpVectors(_v1, _v2, 0.30);
+  body.pelvis.position.copy(_v2);
+  const hd = pose.head;
+  body.cap.position.set(hd[0], hd[1]+0.045, hd[2]);
+  body.brim.position.set(hd[0], hd[1]+0.055, hd[2]+0.145);
+  body.glove.position.set(...pose.lWri);
+  body.shoeR.position.set(pose.rAnk[0], pose.rAnk[1]-0.025, pose.rAnk[2]+0.06);
+  body.shoeL.position.set(pose.lAnk[0], pose.lAnk[1]-0.025, pose.lAnk[2]+0.06);
+}
+
+/* ═══════════════ UI 요소 참조 ═══════════════ */
+const el = {
+  sidebar: document.getElementById('sidebar'),
+  phaseLabel: document.getElementById('phase-label'),
+  badgeKo: document.querySelector('#pitch-badge .ko'),
+  badgeEn: document.querySelector('#pitch-badge .en'),
+  spinHud: document.getElementById('spin-hud'),
+  learnPanel: document.getElementById('learn-panel'),
+  practicePanel: document.getElementById('practice-panel'),
+  btnPlay: document.getElementById('btn-play'),
+  btnReplay: document.getElementById('btn-replay'),
+  tabLearn: document.getElementById('tab-learn'),
+  tabPractice: document.getElementById('tab-practice')
+};
+
+/* ── 릴리스 HUD(범례) 렌더 + 손가락 포커스 모드 ── */
+function renderReleaseHud(p){
+  if(!(state.subMode === 'RELEASE' && p.release.fingers)) return;
+  const rows = Object.entries(p.release.fingers).map(([n,a]) =>
+    `<div class="hud-row${state.focusFinger===n ? ' sel' : ''}" data-finger="${n}">` +
+    `<span style="color:${MARKER_COLORS[n]}">●</span> ${FINGER_KO[n]} — ${ROLE_KO[a.role]}</div>`).join('');
+  el.spinHud.innerHTML =
+    '<b style="color:#e8edf7">손가락 움직임 · 클릭하면 확대 관찰</b>' + rows +
+    `<div class="hud-row${!state.focusFinger ? ' sel' : ''}" data-finger="">⊙ 전체 보기</div>`;
+}
+function setFocusFinger(name){
+  clearFocusVisuals();
+  state.focusFinger = name || null;
+  const p = PITCHES[state.currentPitch];
+  if(state.focusFinger && p.release.fingers && p.release.fingers[state.focusFinger]){
+    focusLabel = makeLabel(
+      FINGER_KO[state.focusFinger] + ' · ' + ROLE_KO[p.release.fingers[state.focusFinger].role],
+      MARKER_COLORS[state.focusFinger]);
+    trailGroup.add(focusLabel);
+    // 슬로모션으로 처음부터 재생 + 손끝 근접 카메라
+    state.speed = 0.25;
+    document.querySelectorAll('.spd-btn').forEach(x=>x.classList.toggle('active', x.dataset.speed==='0.25'));
+    resetAnimation(); state.playing = true; updatePlayBtn();
+    if(handRig.ready){
+      handRig.root.updateMatrixWorld(true);
+      const tip = handRig.joints[HAND_CHAINS[state.focusFinger][3]].getWorldPosition(new THREE.Vector3());
+      controls.target.copy(tip);
+      camera.position.copy(tip).add(new THREE.Vector3(1.2, 0.6, -1.6));
+    }
+  } else {
+    setCameraView('GRIP', true);
+  }
+  renderReleaseHud(p);
+}
+document.getElementById('spin-hud').addEventListener('click', (e)=>{
+  const row = e.target.closest('[data-finger]');
+  if(!row || state.subMode !== 'RELEASE') return;
+  setFocusFinger(row.dataset.finger || null);
+});
+
+/* ═══════════════ 사이드바 (구종 목록, 14구종 체계) ═══════════════ */
+function buildSidebar(){
+  el.sidebar.innerHTML = '';
+  const byFam = {};
+  for(const p of Object.values(PITCHES)){
+    (byFam[p.family] = byFam[p.family] || []).push(p);
+  }
+  for(const fam of ['FASTBALL','BREAKING','OFFSPEED','SPECIAL']){
+    if(!byFam[fam]) continue;
+    const h = document.createElement('div');
+    h.className = 'fam-title '+fam;
+    h.textContent = FAMILY_NAMES[fam];
+    el.sidebar.appendChild(h);
+    for(const p of byFam[fam]){
+      const b = document.createElement('button');
+      b.className = 'pitch-btn' + (p.phase===2?' locked':'') + (p.id===state.currentPitch?' active':'');
+      b.dataset.pitch = p.id;
+      b.innerHTML = `<span>${p.nameKo}<span class="en">${p.nameEn}</span></span>` +
+                    (p.phase===2 ? '<span class="lock">🔒</span>' : '<span>'+'★'.repeat(p.difficulty)+'</span>');
+      if(p.phase===2){
+        b.title = 'Phase 2 확장 구종 — pitches 데이터만 채우면 활성화됩니다';
+      } else {
+        b.addEventListener('click', ()=> selectPitch(p.id));
+      }
+      el.sidebar.appendChild(b);
+    }
+  }
+}
+
+/* ═══════════════ 정보 패널 (원리 이해) ═══════════════ */
+const SUB_NOTE_KEY = { GRIP:'grip', RELEASE:'release', SPIN:'spin', PATH:'trajectory' };
+function renderLearnPanel(){
+  const p = PITCHES[state.currentPitch];
+  let noteHtml = '';
+  if(state.subMode==='MOTION'){
+    noteHtml = `<h3>④ 투구 자세 6단계</h3>
+      <p>모든 구종이 공유하는 기본 동작입니다:<br>
+      <b>준비(SET) → 다리 들기 → 내딛기(STRIDE) → 팔 준비(COCKING) → 릴리스 → 팔로스루</b></p>
+      <p>구종이 달라져도 팔 스피드와 폼은 최대한 같게 유지하는 것이 좋은 투구의 비밀입니다.</p>`;
+  } else {
+    const key = SUB_NOTE_KEY[state.subMode];
+    const section = p[key === 'trajectory' ? 'trajectory' : key];
+    const titles = { GRIP:'① 그립 포인트', RELEASE:'② 릴리스 포인트', SPIN:'③ 회전의 비밀', PATH:'⑤ 궤적 읽기' };
+    noteHtml = `<h3>${titles[state.subMode]}</h3><p>${section.note}</p>`;
+    if(state.subMode==='SPIN'){
+      noteHtml += `<div class="box"><p>회전 종류: <b style="color:var(--accent2)">${p.spin.label}</b><br>회전수(참고): 약 ${p.spin.rpm} RPM</p></div>`;
+    }
+  }
+  const safetyHtml = p.safety ? `<div class="box safety"><p>⚠️ ${p.safety}</p></div>` : '';
+  el.learnPanel.innerHTML = `
+    <h2>${p.nameKo} <span class="diff">${'★'.repeat(p.difficulty)}</span></h2>
+    <div><span class="tag ${p.family}">${FAMILY_NAMES[p.family]}</span>
+    <span style="font-size:11px;color:var(--dim)">${p.nameEn}</span></div>
+    <div class="box"><p>${p.summary}</p></div>
+    <h3>🔬 왜 이렇게 움직일까?</h3>
+    <p>${p.principle}</p>
+    ${noteHtml}
+    ${safetyHtml}
+    <h3>💡 학습 흐름</h3>
+    <p style="font-size:12px;color:var(--dim)">그립 → 릴리스 → 회전 → 투구 자세 → 궤적 순서로 하나씩 살펴본 뒤,
+    상단의 <b style="color:var(--accent)">✋ 실제 연습</b> 탭에서 진짜 공으로 확인해 보세요.</p>`;
+}
+
+/* ═══════════════ 카메라 그립 체크 (SDD Phase 3): 사진 → 손 관절 인식 → 교정 안내 ═══════════════ */
+let handLandmarker = null;
+async function ensureLandmarker(){
+  if(handLandmarker) return handLandmarker;
+  const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs');
+  const files = await vision.FilesetResolver.forVisionTasks(
+    'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+  handLandmarker = await vision.HandLandmarker.createFromOptions(files, {
+    baseOptions:{ modelAssetPath:
+      'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task' },
+    runningMode:'IMAGE', numHands:1
+  });
+  return handLandmarker;
+}
+const HAND_LINKS = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],
+  [9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+const LM_COLOR = (i)=> i>=17?'#ce93d8' : i>=13?'#b2ff59' : i>=9?'#40c4ff' : i>=5?'#ff5252' : '#ffd740';
+
+/* 구종별 사진 그립 점검 규칙 (2D 랜드마크 기반 휴리스틱) */
+function gripPhotoChecks(pitchId, m){
+  const c = [];
+  const push = (ok, okMsg, fixMsg)=>c.push({ok, msg: ok?okMsg:fixMsg});
+  switch(pitchId){
+    case 'fourSeam': case 'twoSeam': case 'cutter': case 'sinker': case 'slider': case 'sweeper':
+      push(m.spreadIM < 0.55, '검지·중지 간격이 좁게 잘 모였어요!', '검지와 중지를 1~2cm 정도로 더 붙여보세요.');
+      push(m.extIndex && m.extMiddle, '검지·중지가 펴져서 공 위에 올라갈 준비가 됐어요.', '검지·중지를 좀 더 펴서 공 위(실밥)에 올려보세요.');
+      break;
+    case 'circleChange':
+      push(m.circleTI < 0.45, '엄지·검지 서클(OK 모양)이 잘 만들어졌어요!', '엄지와 검지 끝을 더 가까이 모아 동그라미를 만들어보세요.');
+      push(m.extMiddle && m.extRing, '중지·약지가 공을 지지할 준비가 됐어요.', '중지와 약지를 펴서 공 위를 지지해 주세요.');
+      break;
+    case 'vulcanChange':
+      push(m.gapMR > 0.45, '중지·약지 사이가 벌칸 인사처럼 잘 벌어졌어요!', '중지와 약지 사이를 V자로 더 벌려보세요.');
+      break;
+    case 'forkball':
+      push(m.spreadIM > 0.75, '검지·중지가 크게 벌어진 포크 그립이에요!', '검지·중지를 더 벌려야 해요 — 아프면 스플리터 그립으로!');
+      break;
+    case 'splitter':
+      push(m.spreadIM > 0.50 && m.spreadIM < 0.95, '포크볼보다 좁고 포심보다 넓은, 딱 스플리터 폭이에요.', '포크볼보다는 좁게, 포심보다는 넓게 벌려보세요.');
+      break;
+    case 'curveball':
+      push(m.extMiddle, '중지가 펴져서 실밥에 걸 수 있어요.', '중지를 펴서 실밥에 단단히 걸어보세요.');
+      push(m.circleTI > 0.3, '검지·엄지에 힘이 안 몰려 있어요 — 좋아요.', '커브는 중지가 주인공! 검지·엄지는 힘을 빼세요.');
+      break;
+    case 'knuckleCurve':
+      push(m.curlIndex < 0.75, '검지가 갈고리처럼 잘 구부러졌어요 — 너클 그립!', '검지를 더 구부려 손톱을 공에 대보세요.');
+      push(m.extMiddle, '중지가 실밥에 걸릴 준비가 됐어요.', '중지는 펴서 실밥에 걸어주세요.');
+      break;
+    case 'knuckleball':
+      push(m.curlIndex < 0.8 && m.curlMiddle < 0.8, '손끝을 세운 너클볼 그립이에요!', '검지·중지를 구부려 손끝(손톱)으로 공을 찍어보세요.');
+      break;
+    default:
+      push(true, '손이 잘 인식됐어요. 왼쪽 3D 그립과 비교해 보세요.', '');
+  }
+  return c;
+}
+
+async function analyzeGripPhoto(file, canvas, resultDiv){
+  const p = PITCHES[state.currentPitch];
+  resultDiv.innerHTML = '<p style="color:var(--accent2)">🔍 손 인식 AI 준비 중... (첫 사용 시 10~20초 걸릴 수 있어요)</p>';
+  try{ await ensureLandmarker(); }
+  catch(e){
+    console.warn(e);
+    resultDiv.innerHTML = '<p style="color:var(--warn)">AI 모델을 불러오지 못했어요. 인터넷 연결을 확인해 주세요.</p>';
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+  try{ img.src = url; await img.decode(); }
+  catch(e){ resultDiv.innerHTML = '<p style="color:var(--warn)">이미지를 열 수 없어요.</p>'; return; }
+  resultDiv.innerHTML = '<p style="color:var(--accent2)">🖐 손가락 위치 분석 중...</p>';
+  let det;
+  try{ det = handLandmarker.detect(img); }
+  catch(e){ resultDiv.innerHTML = '<p style="color:var(--warn)">분석에 실패했어요. 다른 사진으로 다시 시도해 주세요.</p>'; return; }
+  // 사진 + 랜드마크 그리기
+  const W = Math.min(img.naturalWidth, 640);
+  const H = Math.round(img.naturalHeight * W / img.naturalWidth);
+  canvas.width = W; canvas.height = H;
+  canvas.style.display = 'block';
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, W, H);
+  URL.revokeObjectURL(url);
+  if(!det.landmarks || det.landmarks.length === 0){
+    resultDiv.innerHTML = '<p style="color:var(--warn)">손을 찾지 못했어요 😢<br>· 밝은 곳에서 · 공을 쥔 손 전체가 나오게 · 손등이 보이는 각도로 다시 찍어보세요.</p>';
+    return;
+  }
+  const L = det.landmarks[0];
+  ctx.lineWidth = Math.max(2, W/220); ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+  for(const [a,b] of HAND_LINKS){
+    ctx.beginPath(); ctx.moveTo(L[a].x*W, L[a].y*H); ctx.lineTo(L[b].x*W, L[b].y*H); ctx.stroke();
+  }
+  for(let i = 0; i < 21; i++){
+    ctx.fillStyle = LM_COLOR(i);
+    ctx.beginPath(); ctx.arc(L[i].x*W, L[i].y*H, Math.max(3, W/130), 0, Math.PI*2); ctx.fill();
+  }
+  // 손 크기 대비 거리 지표
+  const d = (a,b)=>Math.hypot(L[a].x-L[b].x, L[a].y-L[b].y);
+  const scale = Math.max(d(0,9), 1e-6);
+  const m = {
+    spreadIM: d(8,12)/scale,             // 검지-중지 끝 간격
+    circleTI: d(4,8)/scale,              // 엄지-검지 끝 (서클)
+    gapMR:    d(12,16)/scale,            // 중지-약지 끝 간격
+    curlIndex:  d(8,5)/scale,            // 검지 굽힘 (작을수록 구부림)
+    curlMiddle: d(12,9)/scale
+  };
+  m.extIndex  = m.curlIndex  > 0.85;
+  m.extMiddle = m.curlMiddle > 0.85;
+  m.extRing   = d(16,13)/scale > 0.8;
+  const checks = gripPhotoChecks(p.id, m);
+  const okCount = checks.filter(x=>x.ok).length;
+  const lines = checks.map(x=>`<div class="score-line ${x.ok?'ok':'fix'}">${x.msg}</div>`).join('');
+  const head = okCount === checks.length
+    ? '💯 사진 속 그립이 아주 좋아요!'
+    : '📋 아래 항목을 확인하며 다시 쥐어보세요.';
+  resultDiv.innerHTML = `<div class="box"><p style="font-size:13px;margin-bottom:8px"><b>${p.nameKo}</b> 그립 사진 분석 (${okCount}/${checks.length})</p>
+    <p style="font-size:13px;margin-bottom:8px">${head}</p>${lines}</div>
+    <div class="disclaimer">※ 사진 각도·조명에 따라 부정확할 수 있어요. 왼쪽 3D 그립과 함께 참고용으로만 사용하세요.</div>`;
+}
+
+/* ═══════════════ 실제 연습 패널 (자가진단) ═══════════════ */
+let answers = {};
+function renderPracticePanel(){
+  const p = PITCHES[state.currentPitch];
+  answers = {};
+  const qs = p.coaching.map((c,i)=>`
+    <div class="q-item">
+      <div class="q">Q${i+1}. ${c.q}</div>
+      <div class="yn">
+        <button data-q="${i}" data-a="YES">YES</button>
+        <button data-q="${i}" data-a="NO">NO</button>
+      </div>
+    </div>`).join('');
+  const routine = p.practice.routine.map(r=>`<li>${r}</li>`).join('');
+  const safetyHtml = p.safety ? `<div class="box safety"><p>⚠️ ${p.safety}</p></div>` : '';
+  el.practicePanel.innerHTML = `
+    <h2>✋ ${p.nameKo} 연습</h2>
+    <div><span class="tag ${p.family}">${FAMILY_NAMES[p.family]}</span></div>
+    <h3>📋 연습 순서</h3>
+    <ul style="list-style:none;padding-left:2px">${routine}</ul>
+    ${safetyHtml}
+    <h3>📷 카메라 그립 체크 (베타)</h3>
+    <p style="font-size:11.5px;color:var(--dim)">실제 공을 쥔 손을 사진으로 찍어 올리면 AI가 손가락 위치를 인식해 이 구종에 맞는지 알려줍니다.</p>
+    <input type="file" id="grip-photo-input" accept="image/*" capture="environment" style="display:none">
+    <button id="grip-photo-btn">📷 그립 사진 찍기 / 올리기</button>
+    <canvas id="grip-photo-canvas" style="width:100%;display:none;border-radius:10px;margin-top:8px"></canvas>
+    <div id="grip-photo-result"></div>
+    <h3>✅ 자가진단 — 실제 공을 쥐고 확인하세요</h3>
+    <p style="font-size:11.5px;color:var(--dim)">왼쪽 3D 그립과 내 손을 비교하면서 정직하게 답해 보세요.</p>
+    ${qs}
+    <button id="score-btn">결과 보기</button>
+    <div id="score-result"></div>
+    <div class="disclaimer">※ 이 점수는 의료적·전문적 평가가 아닌 학습용 자가진단 점수입니다.</div>
+    <div class="box safety" style="margin-top:14px"><p>🧒 청소년 안전 수칙: 무리한 손목 비틀기 금지 · 변화구 과도한 반복 연습 금지 · 아프면 즉시 중단 · 실전 연습은 보호자/지도자와 함께</p></div>`;
+  // routine을 리스트로 다시 렌더 (위 join 안전 처리)
+  el.practicePanel.querySelector('ul').innerHTML = routine;
+
+  // 카메라 그립 체크 연결
+  const photoInput = el.practicePanel.querySelector('#grip-photo-input');
+  const photoBtn = el.practicePanel.querySelector('#grip-photo-btn');
+  const photoCanvas = el.practicePanel.querySelector('#grip-photo-canvas');
+  const photoResult = el.practicePanel.querySelector('#grip-photo-result');
+  photoBtn.addEventListener('click', ()=> photoInput.click());
+  photoInput.addEventListener('change', ()=>{
+    const f = photoInput.files && photoInput.files[0];
+    if(f) analyzeGripPhoto(f, photoCanvas, photoResult);
+    photoInput.value = '';
+  });
+
+  el.practicePanel.querySelectorAll('.yn button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const qi = b.dataset.q;
+      answers[qi] = b.dataset.a;
+      const pair = b.parentElement.querySelectorAll('button');
+      pair.forEach(x=>x.classList.remove('sel-yes','sel-no'));
+      b.classList.add(b.dataset.a==='YES'?'sel-yes':'sel-no');
+    });
+  });
+  el.practicePanel.querySelector('#score-btn').addEventListener('click', ()=>{
+    const res = el.practicePanel.querySelector('#score-result');
+    const total = p.coaching.length;
+    const answered = Object.keys(answers).length;
+    if(answered < total){
+      res.innerHTML = `<p style="color:var(--warn);font-size:13px;text-align:center">아직 답하지 않은 질문이 ${total-answered}개 있어요!</p>`;
+      return;
+    }
+    let correct = 0;
+    const lines = p.coaching.map((c,i)=>{
+      const ok = answers[i]===c.correct;
+      if(ok) correct++;
+      return `<div class="score-line ${ok?'ok':'fix'}">${c.fb}</div>`;
+    }).join('');
+    const score = Math.round(100*correct/total);
+    const msg = score===100 ? '완벽해요! 다음 구종에 도전해 보세요 🎉'
+              : score>=70 ? '좋아요! △ 항목만 다시 확인해 보세요 💪'
+              : '3D 그립을 다시 돌려보며 천천히 비교해 보세요 🔍';
+    res.innerHTML = `<div class="box"><div class="score-big">${score}<span style="font-size:16px;color:var(--dim)"> / 100</span></div>
+      <p style="text-align:center;font-size:13px;margin:6px 0 10px">${msg}</p>${lines}</div>`;
+  });
+}
+
+/* ═══════════════ 카메라 프리셋 ═══════════════ */
+function setCameraView(view, force=false){
+  state.cameraView = view;
+  const isBallMode = ['GRIP','RELEASE','SPIN'].includes(state.subMode);
+  if(isBallMode){
+    // 공 클로즈업 (뷰 버튼은 각도만 변경)
+    const presets = {
+      GRIP:   {pos:[3.1,2.5,-4.2], tgt:[0,0,-0.4]},   // 엄지쪽 3/4 시점 — 오른손 그립 사진 각도
+      PITCHER:{pos:[0,1.6,-5.6],  tgt:[0,0,0]},
+      CATCHER:{pos:[0,0.8,5.8],   tgt:[0,0,0]},
+      BATTER: {pos:[5.0,1.1,3.4], tgt:[0,0,0]}
+    };
+    const pr = presets[view] || presets.GRIP;
+    camera.position.set(...pr.pos); controls.target.set(...pr.tgt);
+  } else {
+    const presets = {
+      GRIP:   {pos:[2.6,2.0,-2.6], tgt:[0,1.3,0.6]},     // 릴리스 포인트 클로즈업
+      PITCHER:{pos:[0.8,2.3,-4.5], tgt:[0,1.2,9]},
+      CATCHER:{pos:[0,1.1,20.6],   tgt:[0,1.4,0]},
+      BATTER: {pos:[1.9,1.6,18.2], tgt:[0,1.6,1]}
+    };
+    const pr = presets[view] || presets.PITCHER;
+    camera.position.set(...pr.pos); controls.target.set(...pr.tgt);
+  }
+  document.querySelectorAll('.view-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
+}
+
+/* ═══════════════ 릴리스 애니메이션 상태 ═══════════════ */
+const releaseState = { ballZ:0, done:false };
+function resetAnimation(){
+  state.t = 0;
+  releaseState.ballZ = 0; releaseState.done = false;
+  ball.position.set(0,0,0);
+  if(handGroup) handGroup.position.set(0,0,0);
+  ballWorld.position.set(0,0,0);
+  for(const f of Object.values(fingerMeshes)) f.group.position.set(0,0,0);
+  if(handRig.ready) handRig.setRelease(0, PITCHES[state.currentPitch]);
+  clearTrails();
+  updatePhaseLabel('');
+}
+
+function updatePhaseLabel(text){
+  el.phaseLabel.textContent = text;
+  el.phaseLabel.style.display = text ? 'block' : 'none';
+}
+
+/* ═══════════════ 서브모드 전환 ═══════════════ */
+function setSubMode(sub){
+  state.subMode = sub;
+  const isBallMode = ['GRIP','RELEASE','SPIN'].includes(sub);
+  ballWorld.visible = isBallMode;
+  fieldWorld.visible = !isBallMode;
+  const p = PITCHES[state.currentPitch];
+
+  if(handGroup) handGroup.visible = (sub!=='SPIN');
+  if(markerGroup) markerGroup.visible = (sub==='GRIP');
+  spinHelper.visible = (sub==='SPIN');
+  el.spinHud.style.display = (sub==='SPIN' || sub==='RELEASE') ? 'block' : 'none';
+  if(sub==='SPIN'){
+    el.spinHud.innerHTML = `${p.spin.label} · 약 ${p.spin.rpm} RPM`;
+  } else if(sub==='RELEASE' && p.release.fingers){
+    renderReleaseHud(p);
+  }
+  trailGroup.visible = (sub==='RELEASE');
+  if(sub!=='RELEASE') clearFocusVisuals();
+
+  skeleton.visible = (sub==='MOTION') && !pitcherRig.ready;
+  if(pitcherRig.root) pitcherRig.root.visible = (sub==='MOTION') && pitcherRig.ready;
+  motionBall.visible = (sub==='MOTION');
+  if(trajLine) trajLine.visible = (sub==='PATH');
+  trajBall.visible = (sub==='PATH');
+
+  resetAnimation();
+  state.playing = (sub!=='GRIP');   // 그립은 정지 관찰, 나머지는 자동 재생
+  updatePlayBtn();
+
+  // 서브모드별 기본 카메라
+  if(isBallMode) setCameraView('GRIP', true);
+  else setCameraView('PITCHER', true);
+
+  // 뷰 버튼 활성/비활성 (공 모드에서도 각도 변경은 허용)
+  document.querySelectorAll('.sub-btn').forEach(b=>b.classList.toggle('active', b.dataset.sub===sub));
+  const playable = (sub!=='GRIP');
+  el.btnPlay.disabled = !playable; el.btnReplay.disabled = !playable;
+  document.querySelectorAll('.spd-btn').forEach(b=>b.disabled = !playable);
+
+  if(state.topMode==='LEARN') renderLearnPanel();
+}
+
+/* ═══════════════ 구종 선택 ═══════════════ */
+function selectPitch(id){
+  state.currentPitch = id;
+  const p = PITCHES[id];
+  el.badgeKo.textContent = p.nameKo;
+  el.badgeEn.textContent = p.nameEn;
+  ball.rotation.set(...p.grip.ballRotation);
+  applyHand(p);
+  buildMarkers(p);
+  buildSpinHelper(p);
+  buildTrajectory(p);
+  document.querySelectorAll('.pitch-btn').forEach(b=>b.classList.toggle('active', b.dataset.pitch===id));
+  setSubMode(state.topMode==='PRACTICE' ? 'GRIP' : state.subMode);
+  if(state.topMode==='PRACTICE') renderPracticePanel(); else renderLearnPanel();
+}
+
+/* ═══════════════ 상단 모드 (원리 이해 / 실제 연습) ═══════════════ */
+function setTopMode(mode){
+  state.topMode = mode;
+  el.tabLearn.classList.toggle('active', mode==='LEARN');
+  el.tabPractice.classList.toggle('active', mode==='PRACTICE');
+  el.learnPanel.style.display = mode==='LEARN' ? 'block' : 'none';
+  el.practicePanel.style.display = mode==='PRACTICE' ? 'block' : 'none';
+  if(mode==='PRACTICE'){
+    setSubMode('GRIP');           // 연습 모드는 그립 관찰 화면 고정
+    renderPracticePanel();
+    document.getElementById('submode-group').style.opacity = '0.4';
+    document.querySelectorAll('.sub-btn').forEach(b=>b.disabled=true);
+  } else {
+    document.getElementById('submode-group').style.opacity = '1';
+    document.querySelectorAll('.sub-btn').forEach(b=>b.disabled=false);
+    renderLearnPanel();
+  }
+}
+
+/* ═══════════════ 재생 컨트롤 ═══════════════ */
+function updatePlayBtn(){
+  el.btnPlay.textContent = state.playing ? '⏸ 일시정지' : '▶ 재생';
+}
+el.btnPlay.addEventListener('click', ()=>{ state.playing = !state.playing; updatePlayBtn(); });
+el.btnReplay.addEventListener('click', ()=>{ resetAnimation(); state.playing = true; updatePlayBtn(); });
+document.querySelectorAll('.spd-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    state.speed = parseFloat(b.dataset.speed);
+    document.querySelectorAll('.spd-btn').forEach(x=>x.classList.toggle('active', x===b));
+  });
+});
+document.querySelectorAll('.view-btn').forEach(b=>{
+  b.addEventListener('click', ()=> setCameraView(b.dataset.view, true));
+});
+document.querySelectorAll('.sub-btn').forEach(b=>{
+  b.addEventListener('click', ()=> setSubMode(b.dataset.sub));
+});
+el.tabLearn.addEventListener('click', ()=> setTopMode('LEARN'));
+el.tabPractice.addEventListener('click', ()=> setTopMode('PRACTICE'));
+
+/* ═══════════════ 애니메이션 업데이트 ═══════════════ */
+const clock = new THREE.Clock();
+const _spinAxis = new THREE.Vector3();
+const _ballC = new THREE.Vector3(), _tipP = new THREE.Vector3(), _arDir = new THREE.Vector3();
+const _lblOff = new THREE.Vector3(), _followD = new THREE.Vector3();
+
+function updateRelease(p, dt){
+  const {thumbTiming, fingerTiming} = p.release;
+  if(state.playing && !releaseState.done){
+    state.t += dt / DUR.RELEASE * state.speed;
+    if(state.t >= 1){ state.t = 1; releaseState.done = true; }
+  }
+  const t = state.t;
+  // 단계 라벨
+  let label;
+  if(t < 0.2) label = 'GRIP 그립';
+  else if(t < 0.42) label = 'LOAD 준비';
+  else if(t < thumbTiming) label = 'ACCELERATION 가속';
+  else if(t < fingerTiming) label = 'THUMB RELEASE 엄지 분리';
+  else if(t < 0.96) label = 'FINGER RELEASE 손끝 릴리스';
+  else label = 'BALL SPIN 공 회전!';
+  updatePhaseLabel(label + `  (${Math.round(t*100)}%)`);
+
+  // 전체 전진 (가속 구간)
+  const fwd = Math.min(t, fingerTiming) / fingerTiming;
+  ballWorld.position.z = -0.8 + 1.2 * fwd*fwd;
+
+  // 구종별 손가락 역할(누르기·긁기·지지·먼저 놓기)대로 손이 움직이며 공 분리
+  const tk = smoothstep01(t, thumbTiming, thumbTiming+0.14);
+  const fk = smoothstep01(t, fingerTiming, fingerTiming+0.10);
+  if(handRig.ready){
+    handRig.setRelease(t, p);
+    // 손끝 궤적 · 동작 화살표 · 포커스 카메라 추적
+    handRig.root.updateMatrixWorld(true);
+    ball.getWorldPosition(_ballC);
+    for(const [name, chain] of Object.entries(HAND_CHAINS)){
+      const tip = handRig.joints[chain[3]].getWorldPosition(_tipP);
+      const tr = fingerTrails[name];
+      if(state.playing && !releaseState.done){
+        tr.pts.push(tip.clone());
+        if(tr.pts.length > 44) tr.pts.shift();
+        tr.line.geometry.setFromPoints(tr.pts);
+      }
+      const isFocus = (state.focusFinger === name);
+      tr.line.material.opacity = state.focusFinger ? (isFocus ? 1.0 : 0.10) : 0.85;
+      // 동작 순간 화살표: 누르기=공 안쪽, 긁기=실제 손끝 이동 방향, 놓기=바깥쪽
+      const act = p.release.fingers ? p.release.fingers[name] : null;
+      const ar = fingerArrows[name];
+      if(act && t > act.timing - 0.10 && t < act.timing + 0.12){
+        ar.visible = !state.focusFinger || isFocus;
+        ar.position.copy(tip);
+        if(act.role === 'press'){
+          _arDir.copy(_ballC).sub(tip).normalize();
+        } else if(act.role === 'snap' && tr.pts.length > 3){
+          _arDir.copy(tip).sub(tr.pts[tr.pts.length - 4]).normalize();
+        } else {
+          _arDir.copy(tip).sub(_ballC).normalize();
+        }
+        ar.setDirection(_arDir);
+        ar.setLength(act.role === 'hold' ? 0.3 : 0.55, 0.16, 0.09);
+      } else ar.visible = false;
+      if(isFocus){
+        focusTip.visible = true;
+        focusTip.position.copy(tip);
+        if(focusLabel) focusLabel.position.copy(tip).add(_lblOff.set(0, 0.42, 0));
+        _followD.copy(tip).sub(controls.target);
+        controls.target.copy(tip);
+        camera.position.add(_followD);
+      }
+    }
+  } else {
+    const th = fingerMeshes.thumb;
+    if(th){
+      th.group.position.copy(th.baseDir.clone().multiplyScalar(0.55*tk)).add(new THREE.Vector3(0,-0.25*tk,0));
+    }
+    for(const [name,f] of Object.entries(fingerMeshes)){
+      if(name==='thumb') continue;
+      f.group.position.copy(f.baseDir.clone().multiplyScalar(0.45*fk));
+    }
+  }
+  if(t > fingerTiming){
+    const ft = (t - fingerTiming)/(1 - fingerTiming);
+    ball.position.z = ft*ft*5.5;
+    _spinAxis.set(...p.spin.axis).normalize();
+    ball.rotateOnWorldAxis(_spinAxis, p.spin.speed * 18 * dt * state.speed);
+  } else {
+    // 릴리스 전 미세한 회전 준비
+    ball.position.z = 0;
+  }
+}
+function smoothstep01(x, a, b){
+  if(x<=a) return 0; if(x>=b) return 1;
+  const f=(x-a)/(b-a); return f*f*(3-2*f);
+}
+
+function updateSpin(p, dt){
+  if(state.playing){
+    _spinAxis.set(...p.spin.axis).normalize();
+    ball.rotateOnWorldAxis(_spinAxis, p.spin.speed * 6 * dt * state.speed);
+  }
+  updatePhaseLabel(p.spin.label);
+}
+
+function updateMotion(p, dt){
+  if(state.playing){
+    state.t += dt / DUR.MOTION * state.speed;
+    if(state.t >= 1){ state.t = 0; }   // 반복 재생
+  }
+  const t = state.t;
+  const pose = samplePose(t, p);
+  if(pitcherRig.ready) pitcherRig.retarget(pose);
+  else applyPose(pose);
+  // 단계 라벨
+  let pi = 0;
+  while(pi < POSE_TIMES.length-2 && t > POSE_TIMES[pi+1]) pi++;
+  updatePhaseLabel('P'+pi+' · '+POSE_NAMES[pi]);
+  // 공: 릴리스 전엔 오른 손목, 이후엔 홈플레이트 방향으로 비행
+  const RELEASE_T = 0.78;
+  if(t < RELEASE_T){
+    if(pitcherRig.ready && pitcherRig.bones['mixamorigRightHandMiddle1']){
+      pitcherRig.root.updateMatrixWorld(true);
+      pitcherRig.bones['mixamorigRightHandMiddle1'].getWorldPosition(motionBall.position);
+    } else {
+      motionBall.position.set(pose.rWri[0], pose.rWri[1]+0.09, pose.rWri[2]+0.12);
+    }
+  } else {
+    const ft = (t-RELEASE_T)/(1-RELEASE_T);
+    const sx = pose.rWri[0];
+    motionBall.position.set(
+      sx + (0.1-sx)*ft,
+      1.85 + (0.9-1.85)*ft*ft,
+      1.0 + 11*ft
+    );
+    _spinAxis.set(...p.spin.axis).normalize();
+    motionBall.rotateOnWorldAxis(_spinAxis, p.spin.speed*15*dt*state.speed);
+  }
+}
+
+function updatePath(p, dt){
+  const dur = DUR.PATH / p.trajectory.speedFactor;
+  if(state.playing){
+    state.t += dt / dur * state.speed;
+    if(state.t >= 1){ state.t = 0; }   // 반복 재생
+  }
+  const pos = trajCurve.getPointAt(Math.min(state.t, 0.999));
+  trajBall.position.copy(pos);
+  _spinAxis.set(...p.spin.axis).normalize();
+  trajBall.rotateOnWorldAxis(_spinAxis, p.spin.speed*20*dt*state.speed);
+  updatePhaseLabel(`구속감 ${(p.trajectory.speedFactor*100).toFixed(0)}% · 비행 ${(state.t*100).toFixed(0)}%`);
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const p = PITCHES[state.currentPitch];
+  switch(state.subMode){
+    case 'RELEASE': updateRelease(p, dt); break;
+    case 'SPIN':    updateSpin(p, dt); break;
+    case 'MOTION':  updateMotion(p, dt); break;
+    case 'PATH':    updatePath(p, dt); break;
+    default: updatePhaseLabel('공을 드래그해서 360° 돌려보세요');
+  }
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ═══════════════ 시작 ═══════════════ */
+buildSidebar();
+selectPitch('fourSeam');
+setTopMode('LEARN');
+// 리얼 인체 투수 비동기 로드 → 준비되면 MOTION 화면 갱신
+pitcherRig.load(()=>{
+  if(pitcherRig.ready && state.subMode === 'MOTION'){ setSubMode('MOTION'); applyDeepLink(); }
+  // 진단: #debug=2 → P0 리타겟 후 주요 뼈 월드좌표 덤프
+  if(pitcherRig.ready && new URLSearchParams(location.hash.replace(/^#/,'')).get('debug')==='2'){
+    const pose = samplePose(0, PITCHES[state.currentPitch]);
+    pitcherRig.retarget(pose);
+    pitcherRig.root.updateMatrixWorld(true);
+    const v = new THREE.Vector3(), lines = [];
+    for(const n of ['mixamorigHips','mixamorigSpine','mixamorigSpine2','mixamorigNeck','mixamorigHead',
+      'mixamorigRightArm','mixamorigRightForeArm','mixamorigRightHand',
+      'mixamorigLeftArm','mixamorigLeftHand',
+      'mixamorigRightUpLeg','mixamorigRightLeg','mixamorigRightFoot',
+      'mixamorigLeftUpLeg','mixamorigLeftLeg','mixamorigLeftFoot']){
+      pitcherRig.bones[n].getWorldPosition(v);
+      lines.push(n+' ('+v.toArray().map(x=>x.toFixed(3)).join(',')+')');
+    }
+    lines.push('rootPos='+pitcherRig.root.position.toArray().map(x=>x.toFixed(3)));
+    lines.push('rootScale='+pitcherRig.root.scale.x.toFixed(3));
+    const pre = document.createElement('pre'); pre.id='pdump';
+    pre.textContent = lines.join('\n');
+    document.body.appendChild(pre);
+  }
+});
+// 리깅된 리얼 핸드 비동기 로드 → 준비되면 현재 구종에 다시 적용
+handRig.load(()=>{
+  if(handRig.ready){ selectPitch(state.currentPitch); applyDeepLink(); }
+  // 개발 진단용: #debug=1 이면 관절 월드좌표를 DOM으로 덤프
+  if(new URLSearchParams(location.hash.replace(/^#/,'')).get('debug')==='1'){
+    const pre = document.createElement('pre');
+    pre.id = 'rigdump';
+    const v = new THREE.Vector3();
+    const lines = ['ready='+handRig.ready, 'lastError='+(handRig.lastError||'none')];
+    if(handRig.ready){
+      scene.updateMatrixWorld(true);
+      lines.push('placerPos='+handRig.placer.position.toArray().map(n=>n.toFixed(3)));
+      for(const [n,b] of Object.entries(handRig.joints)){
+        b.getWorldPosition(v);
+        lines.push(n+' ('+v.toArray().map(x=>x.toFixed(3)).join(',')+')');
+      }
+      // 계측 리포즈: pose를 다시 실행하며 뼈별 회전량 기록
+      handRig.debugLog = [];
+      handRig.pose(PITCHES[state.currentPitch]);
+      lines.push('--- repose log ---', ...handRig.debugLog);
+      scene.updateMatrixWorld(true);
+      for(const tn of ['middle-finger-phalanx-intermediate','middle-finger-tip','thumb-tip']){
+        handRig.joints[tn].getWorldPosition(v);
+        lines.push('AFTER '+tn+' ('+v.toArray().map(x=>x.toFixed(3)).join(',')+')');
+      }
+    }
+    pre.textContent = lines.join('\n');
+    document.body.appendChild(pre);
+  }
+});
+// 테스트/공유용 딥링크: index.html#pitch=slider&sub=PATH&mode=PRACTICE&t=0.9
+function applyDeepLink(){
+  const h = new URLSearchParams(location.hash.replace(/^#/,''));
+  const hp = h.get('pitch'), hs = h.get('sub'), hm = h.get('mode');
+  if(hp && PITCHES[hp] && PITCHES[hp].phase===1) selectPitch(hp);
+  if(hm==='PRACTICE') setTopMode('PRACTICE');
+  if(hs && ['GRIP','RELEASE','SPIN','MOTION','PATH'].includes(hs) && state.topMode==='LEARN') setSubMode(hs);
+  const ht = parseFloat(h.get('t'));
+  if(!isNaN(ht)){ state.t = THREE.MathUtils.clamp(ht, 0, 1); state.playing = false; }
+  const hc = h.get('cam');   // 진단용: cam=x,y,z,tx,ty,tz
+  if(hc){
+    const c = hc.split(',').map(Number);
+    if(c.length === 6 && c.every(n=>!isNaN(n))){
+      camera.position.set(c[0], c[1], c[2]);
+      controls.target.set(c[3], c[4], c[5]);
+    }
+  }
+}
+applyDeepLink();
+resize();
+animate();
+window.__APP_BOOTED = true;   // 부팅 감시 해제
+</script>
+</body>
+</html>
