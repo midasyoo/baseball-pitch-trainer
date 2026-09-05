@@ -37,6 +37,7 @@
   }
   .top-tab.active{background:var(--accent); border-color:var(--accent); color:#20242e;}
   header .note{margin-left:auto; font-size:11px; color:var(--dim);}
+  header .credit{text-align:right; font-size:12px; line-height:1.35; font-weight:600; color:var(--text); white-space:nowrap;}
 
   /* ── 본문 3단 ─────────────────────── */
   #main{flex:1; display:grid; grid-template-columns:225px 1fr 350px; min-height:0;}
@@ -146,6 +147,7 @@
     header .logo{font-size:15px;}
     .top-tab{padding:6px 13px; font-size:12.5px;}
     header .note{display:none;}
+    header .credit{margin-left:auto; font-size:10px;}
     #main{display:block; min-height:0;}
     /* 구종 목록 → 가로 스크롤 칩 바 */
     #sidebar{display:flex; flex-direction:row; align-items:center; gap:6px;
@@ -184,6 +186,7 @@
       <button class="top-tab" id="tab-practice">✋ 실제 연습</button>
     </div>
     <div class="note">청소년 학습용 시뮬레이터 · 전문 평가가 아닌 학습 참고용입니다</div>
+    <div class="credit">기획/제작: 유윤식<br>midasyoo@etri.re.kr</div>
   </header>
 
   <div id="main">
