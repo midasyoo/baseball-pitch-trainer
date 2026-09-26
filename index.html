@@ -2579,6 +2579,33 @@ function applyDeepLink(){
 applyDeepLink();
 resize();
 animate();
+// 홍보 영상 프레임 생성용 훅 — #cap=1 일 때만 내부 상태를 연다.
+// 프레임마다 t 를 직접 찍어 렌더해야 캡처 속도와 무관하게 매끄러운 영상이 나온다.
+if(/[?#&]cap=1/.test(location.href)){
+  window.__CAP = {
+    state, ball, trajBall, camera, controls, scene, renderer, THREE, PITCHES,
+    selectPitch, setSubMode, setTopMode, setCameraView,
+    // t 를 고정하고 한 프레임만 그린다 (재생은 꺼 둔다)
+    seek(t){ state.playing = false; state.t = THREE.MathUtils.clamp(t, 0, 1);
+             releaseState.done = false; },
+    spin(rad){ const a = new THREE.Vector3(...PITCHES[state.currentPitch].spin.axis).normalize();
+               ball.rotateOnWorldAxis(a, rad); },
+    draw(){ renderer.render(scene, camera); },
+    // 현재 시점을 기준으로 방위각만 돌린다 (샷마다 orbitReset 으로 기준을 다시 잡는다)
+    orbitReset(){ this._base = null; },
+    orbitSet(deg){
+      const t = controls.target;
+      if(!this._base){
+        this._base = new THREE.Spherical().setFromVector3(
+          new THREE.Vector3().subVectors(camera.position, t));
+      }
+      const s = this._base.clone();
+      s.theta += deg * Math.PI / 180;
+      camera.position.copy(new THREE.Vector3().setFromSpherical(s).add(t));
+      camera.lookAt(t);
+    }
+  };
+}
 window.__APP_BOOTED = true;   // 부팅 감시 해제
 </script>
 <!-- 방문 집계: https://midasyoo.github.io/stats.html · 수집 범위 https://midasyoo.github.io/privacy.html -->
