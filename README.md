@@ -3,6 +3,19 @@
 아이의 야구 학습을 위한 웹 기반 3D 투구 학습 프로그램.
 `야구 투구 트레이닝 3D 시뮬레이터 SW 상세설계서(SDD) v1.0` 기반 Phase 1 MVP 구현.
 
+## 홍보 영상 (1분)
+
+https://github.com/midasyoo/baseball-pitch-trainer/raw/main/baseball-pitch-trainer-1min-narrated.mp4
+
+| 파일 | 내용 |
+|---|---|
+| `baseball-pitch-trainer-1min-narrated.mp4` | **내레이션 + 배경음 포함** · 1920x1080 · 60초 · 7.6MB |
+| `baseball-pitch-trainer-1min.mp4` | 자막만 (무음) · 발표 배경용 |
+
+구성은 앱의 두 축을 그대로 따른다 — **① 원리 이해**(그립 → 릴리스 → 회전 → 투구 자세 →
+궤적 → 타자 시점 → 6구종)와 **② 실제 연습**(그립 따라 하기 · 카메라 그립 체크 · 자가진단).
+다시 만들거나 구성을 바꾸는 방법은 [`tools/promo/`](tools/promo/) 참고.
+
 ## 실행 방법
 
 ### PC
